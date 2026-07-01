@@ -7,7 +7,7 @@ router = APIRouter(prefix="/datasets", tags=["datasets"])
 controller = DatasetController()
 
 
-@router.post("/download/datasets", response_model=DatasetsDownloadResponse)
+@router.post("/download", response_model=DatasetsDownloadResponse)
 async def download_datasets() -> DatasetsDownloadResponse:
     """Baixa os datasets SRAG do OpenDataSUS para a pasta raw_data.
 
