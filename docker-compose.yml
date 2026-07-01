@@ -6,9 +6,11 @@ services:
       - "${API_PORT:-8000}:8000"
     volumes:
       - ./raw_data:/app/raw_data
+      - ./data:/app/data
     env_file:
       - .env
     environment:
       API_HOST: 0.0.0.0
       RAW_DATA_DIR: /app/raw_data
+      DUCKDB_PATH: /app/data/srag.duckdb
     restart: unless-stopped

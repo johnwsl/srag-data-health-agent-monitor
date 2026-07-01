@@ -12,6 +12,7 @@ class DatasetDownloadResult(BaseModel):
     path: str
     size_bytes: int
     success: bool
+    skipped: bool = False
     error: str | None = None
 
 

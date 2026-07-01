@@ -22,11 +22,17 @@ class DatasetController:
                 },
             )
 
-        message = (
-            "Todos os datasets foram baixados com sucesso."
-            if failed == 0
-            else "Download concluído com falhas parciais."
-        )
+        skipped = sum(1 for result in results if result.skipped)
+
+        if failed == 0:
+            if skipped == len(results):
+                message = "Todos os datasets já estavam presentes; nenhum download foi necessário."
+            elif skipped > 0:
+                message = "Download concluído; alguns datasets já estavam presentes."
+            else:
+                message = "Todos os datasets foram baixados com sucesso."
+        else:
+            message = "Download concluído com falhas parciais."
 
         return DatasetsDownloadResponse(
             message=message,

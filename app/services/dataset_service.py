@@ -12,8 +12,26 @@ class DatasetService:
     def _ensure_raw_data_dir(self) -> None:
         self.raw_data_dir.mkdir(parents=True, exist_ok=True)
 
+    def _dataset_exists(self, dataset: DatasetInfo) -> bool:
+        destination = self.raw_data_dir / dataset.name
+        return destination.is_file() and destination.stat().st_size > 0
+
+    def _existing_dataset_result(self, dataset: DatasetInfo) -> DatasetDownloadResult:
+        destination = self.raw_data_dir / dataset.name
+        return DatasetDownloadResult(
+            name=dataset.name,
+            url=dataset.url,
+            path=str(destination),
+            size_bytes=destination.stat().st_size,
+            success=True,
+            skipped=True,
+        )
+
     async def download_dataset(self, client: httpx.AsyncClient, dataset: DatasetInfo) -> DatasetDownloadResult:
         destination = self.raw_data_dir / dataset.name
+
+        if self._dataset_exists(dataset):
+            return self._existing_dataset_result(dataset)
 
         try:
             response = await client.get(dataset.url, follow_redirects=True)
@@ -44,9 +62,14 @@ class DatasetService:
         datasets = [DatasetInfo(**item) for item in self.dataset_urls]
         results: list[DatasetDownloadResult] = []
 
-        async with httpx.AsyncClient(timeout=httpx.Timeout(HTTP_TIMEOUT_SECONDS)) as client:
+        needs_download = any(not self._dataset_exists(dataset) for dataset in datasets)
+
+        if needs_download:
+            async with httpx.AsyncClient(timeout=httpx.Timeout(HTTP_TIMEOUT_SECONDS)) as client:
+                for dataset in datasets:
+                    results.append(await self.download_dataset(client, dataset))
+        else:
             for dataset in datasets:
-                result = await self.download_dataset(client, dataset)
-                results.append(result)
+                results.append(self._existing_dataset_result(dataset))
 
         return results
