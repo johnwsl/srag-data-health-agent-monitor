@@ -1,0 +1,14 @@
+services:
+  api:
+    build: .
+    container_name: srag-api
+    ports:
+      - "${API_PORT:-8000}:8000"
+    volumes:
+      - ./raw_data:/app/raw_data
+    env_file:
+      - .env
+    environment:
+      API_HOST: 0.0.0.0
+      RAW_DATA_DIR: /app/raw_data
+    restart: unless-stopped

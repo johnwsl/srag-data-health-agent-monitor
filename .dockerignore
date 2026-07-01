@@ -1,0 +1,17 @@
+__pycache__
+*.py[cod]
+*$py.class
+*.so
+.Python
+.env
+.venv
+venv/
+env/
+.git
+.gitignore
+.idea
+.vscode
+*.md
+instrução.txt
+raw_data/*.csv
+etl/
