@@ -11,8 +11,9 @@ controller = EtlController()
 def run_etl() -> EtlResponse:
     """Executa o ETL sobre os CSVs em raw_data e salva o resultado no DuckDB.
 
-    Faz merge dos arquivos, seleciona e trata as colunas definidas, filtra
-    registros inválidos, deriva ANO_NOTIFIC/MES_NOTIFIC e persiste na tabela
-    configurada em ETL_TABLE_NAME.
+    Faz merge dos arquivos, seleciona as colunas NU_NOTIFIC, DT_NOTIFIC,
+    SG_UF_NOT, CLASSI_FIN, EVOLUCAO, UTI, VACINA_COV e VACINA, filtra
+    registros inválidos, preenche ausentes com 9, deriva ANO_NOTIFIC/MES_NOTIFIC
+    a partir de DT_NOTIFIC e persiste na tabela configurada em ETL_TABLE_NAME.
     """
     return controller.run_etl()

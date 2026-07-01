@@ -30,7 +30,7 @@ class EtlService:
 
     def _read_columns_for_file(self, csv_file: Path) -> list[str]:
         header = pd.read_csv(csv_file, sep=";", nrows=0, encoding="utf-8").columns.tolist()
-        needed = set(ETL_COLUMNS) | {ETL_DATE_SOURCE_COLUMN}
+        needed = set(ETL_COLUMNS)
         return [column for column in header if column in needed]
 
     def _merge_datasets(self, csv_files: list[Path]) -> pd.DataFrame:
@@ -68,9 +68,9 @@ class EtlService:
             result.loc[missing_mask, column] = ETL_MISSING_VALUE
         return result
 
-    def _add_notification_period(self, frame: pd.DataFrame, source: pd.DataFrame) -> pd.DataFrame:
+    def _add_notification_period(self, frame: pd.DataFrame) -> pd.DataFrame:
         result = frame.copy()
-        notification_dates = pd.to_datetime(source[ETL_DATE_SOURCE_COLUMN], errors="coerce", utc=True)
+        notification_dates = pd.to_datetime(result[ETL_DATE_SOURCE_COLUMN], errors="coerce", utc=True)
         result["ANO_NOTIFIC"] = notification_dates.dt.year
         result["MES_NOTIFIC"] = notification_dates.dt.month
         return result
@@ -105,7 +105,7 @@ class EtlService:
         filtered = self._filter_required_fields(merged)
         selected = self._select_columns(filtered)
         filled = self._fill_missing_values(selected)
-        transformed = self._add_notification_period(filled, filtered)
+        transformed = self._add_notification_period(filled)
         self._save_to_duckdb(transformed)
 
         return {

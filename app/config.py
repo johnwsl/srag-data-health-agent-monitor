@@ -20,6 +20,7 @@ ETL_TABLE_NAME = os.environ["ETL_TABLE_NAME"]
 
 ETL_COLUMNS = [
     "NU_NOTIFIC",
+    "DT_NOTIFIC",
     "SG_UF_NOT",
     "CLASSI_FIN",
     "EVOLUCAO",
