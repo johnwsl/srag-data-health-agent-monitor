@@ -19,6 +19,7 @@ class SragReportAgent:
         self.max_chars = max_chars
 
     def generate_executive_summary(self, estado: str) -> str:
+        pipeline_status = self.metrics_service.ensure_pipeline_ready()
         metrics_tool = self.metrics_service.as_tool()
         news_tool = self.news_service.as_tool()
 
@@ -35,6 +36,8 @@ class SragReportAgent:
 
         user_prompt = (
             f"Estado consultado: {estado.upper().strip()}\n\n"
+            "Status da pipeline SRAG:\n"
+            f"{pipeline_status}\n\n"
             "Dados oficiais da API SRAG:\n"
             f"{official_data}\n\n"
             "Noticias recentes coletadas:\n"

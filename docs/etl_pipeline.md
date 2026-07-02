@@ -378,13 +378,14 @@ O projeto inclui **44 testes** em `tests/`:
 
 | Arquivo | Cobertura |
 |---------|-----------|
-| `test_dataset_service.py` | Download de datasets |
-| `test_etl_service.py` | Pipeline de ETL |
-| `test_srag_metrics.py` | Cálculo de métricas (incluindo por UF) |
-| `test_metrics_routes.py` | Endpoint `GET /metrics/{estado}` |
+| `tests/unit/test_dataset_service.py` | Download de datasets |
+| `tests/unit/test_etl_service.py` | Pipeline de ETL |
+| `tests/unit/test_srag_metrics.py` | Cálculo de métricas (incluindo por UF) |
+| `tests/unit/test_metrics_routes.py` | Rotas de métricas com mocks |
+| `tests/integration/test_metrics_routes.py` | Integração real com a API de métricas |
 
 ```bash
-pytest tests/ -v
+pytest tests/unit tests/integration -v
 ```
 
 Os testes de download usam `httpx.MockTransport` (sem internet). Os testes de ETL e métricas usam bancos DuckDB temporários.
@@ -409,9 +410,9 @@ srag-data-health-agent-monitor/
 
 Com os dados no DuckDB e as métricas expostas pela API, a aplicação está pronta para:
 
-- Integração com **agentes de IA** via tools que consomem `/metrics/{estado}`
-- Geração de **relatórios** automatizados por estado ou nacional
-- **Gráficos** de casos diários e mensais (a implementar)
+- Integração com **agentes de IA** via tools que consomem a API SRAG
+- Geração de **relatórios** automatizados por estado ou nacional via `POST /agents/report`
+- Consumo dos dados no dashboard em **http://localhost:8080**
 - Endpoints adicionais para consulta em lote (ex.: todas as UFs de uma vez)
 
 O pipeline e as métricas formam a **base de dados e indicadores** sobre os quais o restante da solução será construído.

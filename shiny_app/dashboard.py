@@ -104,6 +104,15 @@ ui.tags.style(
     .srag-charts-section {
         margin-top: 1.25rem;
     }
+    .srag-report-section {
+        margin-top: 1.25rem;
+    }
+    .srag-report-text {
+        white-space: pre-wrap;
+        line-height: 1.5;
+        color: #212529;
+        margin-bottom: 0;
+    }
     """
 )
 
@@ -112,12 +121,14 @@ with ui.sidebar(title="Filtros", width=280):
         "estado",
         "Estado / escopo",
         choices=STATE_CHOICES,
-        selected=SRAG_BRASIL_CODE,
+        selected="SP",
     )
+    ui.input_action_button("gerar_relatorio", "Gerar relatório", class_="btn-primary")
 
 
 pipeline_phase = reactive.Value("checking")
 pipeline_error = reactive.Value("")
+report_error = reactive.Value("")
 
 
 def _api_url(path: str) -> str:
@@ -144,6 +155,22 @@ async def run_pipeline_task() -> dict:
     try:
         async with httpx.AsyncClient(timeout=PIPELINE_TIMEOUT_SECONDS) as client:
             response = await client.post(_api_url("/datasets/pipeline"))
+            response.raise_for_status()
+            return {"ok": True, "data": response.json()}
+    except httpx.HTTPStatusError as error:
+        detail = error.response.text
+        return {"ok": False, "error": f"HTTP {error.response.status_code}: {detail}"}
+    except httpx.RequestError as error:
+        return {"ok": False, "error": f"Falha ao conectar à API: {error}"}
+    except Exception as error:  # noqa: BLE001
+        return {"ok": False, "error": str(error)}
+
+
+@reactive.extended_task
+async def generate_report_task(estado: str) -> dict:
+    try:
+        async with httpx.AsyncClient(timeout=PIPELINE_TIMEOUT_SECONDS) as client:
+            response = await client.post(_api_url("/agents/report"), json={"estado": estado})
             response.raise_for_status()
             return {"ok": True, "data": response.json()}
     except httpx.HTTPStatusError as error:
@@ -255,6 +282,17 @@ def daily_cases_payload() -> dict:
 @reactive.calc
 def monthly_cases_payload() -> dict:
     return _fetch_series("/casos-mensais")
+
+
+@reactive.effect
+@reactive.event(input.gerar_relatorio)
+def trigger_report_generation() -> None:
+    if pipeline_phase.get() != "ready":
+        report_error.set("Aguarde a conclusão do pipeline antes de gerar o relatório.")
+        return
+
+    report_error.set("")
+    generate_report_task.invoke(input.estado())
 
 
 def _format_rate(value: float | None, signed: bool = False) -> str:
@@ -456,3 +494,42 @@ with ui.div(class_="srag-main"):
                         showlegend=False,
                     )
                     return fig
+
+    with ui.card(class_="srag-report-section"):
+        ui.card_header("Relatório gerado por IA")
+
+        @render.ui
+        def report_panel():
+            if pipeline_phase.get() != "ready":
+                return ui.p("Aguarde a preparação dos dados para gerar o relatório.", class_="srag-page-subtitle")
+
+            if report_error.get():
+                return ui.p(report_error.get(), class_="srag-error")
+
+            task_status = generate_report_task.status()
+            if task_status == "initial":
+                return ui.p(
+                    "Clique em 'Gerar relatório' para produzir um resumo executivo do estado selecionado.",
+                    class_="srag-page-subtitle",
+                )
+
+            if task_status == "running":
+                return ui.div(
+                    ui.strong("Gerando relatório..."),
+                    ui.p("A IA está consolidando dados oficiais e notícias recentes.", style="margin-bottom: 0;"),
+                    class_="srag-loading",
+                )
+
+            if task_status == "success":
+                result = generate_report_task.result()
+                if not result["ok"]:
+                    return ui.p(result["error"], class_="srag-error")
+                return ui.p(result["data"]["resumo_executivo"], class_="srag-report-text")
+
+            if task_status == "error":
+                try:
+                    generate_report_task.result()
+                except Exception as error:  # noqa: BLE001
+                    return ui.p(str(error), class_="srag-error")
+
+            return ui.p("Não foi possível gerar o relatório.", class_="srag-error")

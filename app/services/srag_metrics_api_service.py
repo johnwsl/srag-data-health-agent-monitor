@@ -55,12 +55,34 @@ class SragMetricsApiLangChainService:
         response.raise_for_status()
         return response.json()
 
+    def _post_json(self, path: str) -> dict[str, Any]:
+        response = self._get_client().post(f"{self.api_base_url}{path}")
+        response.raise_for_status()
+        return response.json()
+
     def _normalize_estado(self, estado: str) -> str:
         return estado.strip().upper()
 
     def get_metrics(self, estado: str) -> dict[str, Any]:
         estado = self._normalize_estado(estado)
         return self._request_json(f"/metrics/{estado}")
+
+    def get_dataset_status(self) -> dict[str, Any]:
+        return self._request_json("/datasets/status")
+
+    def run_pipeline(self) -> dict[str, Any]:
+        return self._post_json("/datasets/pipeline")
+
+    def ensure_pipeline_ready(self) -> dict[str, Any]:
+        status_payload = self.get_dataset_status()
+        if status_payload.get("ready") is True:
+            return status_payload
+
+        self.run_pipeline()
+        status_payload = self.get_dataset_status()
+        if status_payload.get("ready") is not True:
+            raise RuntimeError("Pipeline SRAG nao ficou pronta apos a execucao automatica.")
+        return status_payload
 
     def get_daily_cases(self, estado: str) -> dict[str, Any]:
         estado = self._normalize_estado(estado)

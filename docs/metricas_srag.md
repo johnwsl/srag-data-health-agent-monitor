@@ -581,11 +581,12 @@ Os cenários acima são cobertos por testes em:
 
 | Arquivo | Testes |
 |---------|--------|
-| `tests/test_srag_metrics.py` | Cálculo, escopo por UF, métodos em lote |
-| `tests/test_metrics_routes.py` | Endpoint `GET /metrics/{estado}` |
+| `tests/unit/test_srag_metrics.py` | Cálculo, escopo por UF, métodos em lote |
+| `tests/unit/test_metrics_routes.py` | Rotas de métricas com mocks |
+| `tests/integration/test_metrics_routes.py` | Integração real com os endpoints de métricas |
 
 ```bash
-pytest tests/test_srag_metrics.py tests/test_metrics_routes.py -v
+pytest tests/unit/test_srag_metrics.py tests/unit/test_metrics_routes.py tests/integration/test_metrics_routes.py -v
 ```
 
 ---
@@ -595,6 +596,7 @@ pytest tests/test_srag_metrics.py tests/test_metrics_routes.py -v
 As métricas já estão disponíveis via API e prontas para:
 
 - Integração com **agentes de IA** para geração de relatórios
-- **Gráficos** de casos diários e mensais (a implementar)
+- Consumo no dashboard em **http://localhost:8080**
+- Uso pelo endpoint `POST /agents/report`
 - Endpoint de consulta em lote para todas as UFs de uma vez
 - Parâmetro opcional de `reference_date` na API (hoje fixo em “hoje” no serviço)

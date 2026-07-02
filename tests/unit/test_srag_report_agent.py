@@ -14,9 +14,15 @@ class FakeTool:
 class FakeMetricsService:
     def __init__(self, response: str) -> None:
         self.tool = FakeTool(response)
+        self.ensure_calls = 0
+        self.pipeline_status = {"ready": True, "message": "Dados SRAG disponíveis para consulta.", "row_count": 10}
 
     def as_tool(self):
         return self.tool
+
+    def ensure_pipeline_ready(self):
+        self.ensure_calls += 1
+        return self.pipeline_status
 
 
 class FakeNewsService:
@@ -51,6 +57,7 @@ def test_generate_executive_summary_orchestrates_tools_and_llm():
     response = agent.generate_executive_summary("sp")
 
     assert response == "Resumo executivo.\nDados oficiais: ...\nNoticias: ..."
+    assert metrics_service.ensure_calls == 1
     assert metrics_service.tool.calls == [{"estado": "sp"}]
     assert news_service.tool.calls == [
         {
@@ -66,6 +73,7 @@ def test_generate_executive_summary_orchestrates_tools_and_llm():
         }
     ]
     assert "Estado consultado: SP" in llm_service.calls[0]["query"]
+    assert "Status da pipeline SRAG:" in llm_service.calls[0]["query"]
     assert "Dados oficiais da API SRAG:" in llm_service.calls[0]["query"]
     assert "Noticias recentes coletadas:" in llm_service.calls[0]["query"]
     assert "Dados oficiais" in llm_service.calls[0]["system_prompt"]

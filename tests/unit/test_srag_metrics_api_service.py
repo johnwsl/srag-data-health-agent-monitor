@@ -71,12 +71,17 @@ def _monthly_payload(estado: str = "SP") -> dict:
 def _build_mock_transport(estado: str = "SP"):
     def handler(request: httpx.Request) -> httpx.Response:
         path = request.url.path
+        method = request.method
 
-        if path == f"/metrics/{estado}":
+        if method == "GET" and path == "/datasets/status":
+            return httpx.Response(200, json={"ready": True, "message": "Dados SRAG disponíveis para consulta.", "row_count": 10})
+        if method == "POST" and path == "/datasets/pipeline":
+            return httpx.Response(200, json={"message": "Pipeline executado com sucesso."})
+        if method == "GET" and path == f"/metrics/{estado}":
             return httpx.Response(200, json=_metrics_payload(estado))
-        if path == f"/metrics/{estado}/casos-diarios":
+        if method == "GET" and path == f"/metrics/{estado}/casos-diarios":
             return httpx.Response(200, json=_daily_payload(estado))
-        if path == f"/metrics/{estado}/casos-mensais":
+        if method == "GET" and path == f"/metrics/{estado}/casos-mensais":
             return httpx.Response(200, json=_monthly_payload(estado))
 
         raise AssertionError(f"Unexpected request: {request.url}")
@@ -86,7 +91,7 @@ def _build_mock_transport(estado: str = "SP"):
 
 def _build_invalid_state_transport():
     def handler(request: httpx.Request) -> httpx.Response:
-        if request.url.path == "/metrics/XX":
+        if request.method == "GET" and request.url.path == "/metrics/XX":
             return httpx.Response(422, json={"detail": "UF invalida: XX. Use uma sigla valida ou BRASIL."})
         raise AssertionError(f"Unexpected request: {request.url}")
 
@@ -144,3 +149,40 @@ def test_as_tool_invokes_service(metrics_api_service):
 
     assert payload["sg_uf_not"] == "SP"
     assert len(payload["metricas"]) == 4
+
+
+def test_ensure_pipeline_ready_returns_existing_status(metrics_api_service):
+    payload = metrics_api_service.ensure_pipeline_ready()
+
+    assert payload["ready"] is True
+    assert payload["row_count"] == 10
+
+
+def test_ensure_pipeline_ready_runs_pipeline_when_not_ready():
+    calls: list[tuple[str, str]] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append((request.method, request.url.path))
+
+        if request.method == "GET" and request.url.path == "/datasets/status":
+            if len([call for call in calls if call == ("GET", "/datasets/status")]) == 1:
+                return httpx.Response(200, json={"ready": False, "message": "Execute o pipeline.", "row_count": 0})
+            return httpx.Response(200, json={"ready": True, "message": "Dados SRAG disponíveis para consulta.", "row_count": 12})
+
+        if request.method == "POST" and request.url.path == "/datasets/pipeline":
+            return httpx.Response(200, json={"message": "Pipeline executado com sucesso."})
+
+        raise AssertionError(f"Unexpected request: {request.method} {request.url}")
+
+    client = httpx.Client(transport=httpx.MockTransport(handler), base_url="http://testserver")
+    service = SragMetricsApiLangChainService(api_base_url="http://testserver", client=client)
+
+    payload = service.ensure_pipeline_ready()
+
+    service.close()
+    assert payload["ready"] is True
+    assert calls == [
+        ("GET", "/datasets/status"),
+        ("POST", "/datasets/pipeline"),
+        ("GET", "/datasets/status"),
+    ]
