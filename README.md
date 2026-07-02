@@ -2,7 +2,7 @@
 
 API em FastAPI para ingestão, tratamento e disponibilização de dados de **SRAG** (Síndrome Respiratória Aguda Grave) do [OpenDataSUS](https://opendatasus.saude.gov.br/). O sistema faz o download dos datasets brutos, executa um pipeline de ETL, persiste os dados tratados em **DuckDB**, expõe **métricas de saúde** por estado ou para todo o Brasil e disponibiliza um **dashboard web em `http://localhost:8080`** com visualização interativa e geração de relatório por IA.
 
-![Figura — monitor](docs/monitor.png)
+![Figura — monitor](docs/dashboard.png)
 
 ## O que o sistema faz
 
