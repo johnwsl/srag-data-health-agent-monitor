@@ -1,6 +1,8 @@
+import duckdb
 import pytest
 
 from app.config import ETL_COLUMNS
+from app.services.srag_metrics import SRAGMetrics
 
 SRAG_HEADER = ";".join(f'"{column}"' for column in ETL_COLUMNS)
 
@@ -39,3 +41,49 @@ def dataset_urls() -> list[dict[str, str]]:
         {"name": "dataset_a.csv", "url": "http://testserver/dataset_a.csv"},
         {"name": "dataset_b.csv", "url": "http://testserver/dataset_b.csv"},
     ]
+
+
+@pytest.fixture
+def metrics_db(tmp_path):
+    db_path = tmp_path / "metrics.duckdb"
+    connection = duckdb.connect(str(db_path))
+    connection.execute(
+        """
+        CREATE TABLE srag_notificacoes (
+            NU_NOTIFIC VARCHAR,
+            DT_NOTIFIC VARCHAR,
+            SG_UF_NOT VARCHAR,
+            CLASSI_FIN VARCHAR,
+            EVOLUCAO VARCHAR,
+            UTI VARCHAR,
+            VACINA_COV VARCHAR,
+            VACINA VARCHAR,
+            ANO_NOTIFIC INTEGER,
+            MES_NOTIFIC INTEGER
+        )
+        """
+    )
+    rows = [
+        ("1", "2026-06-01", "SP", "1", "1", "2", "9", "2", 2026, 6),
+        ("2", "2026-06-02", "SP", "2", "1", "2", "9", "2", 2026, 6),
+        ("3", "2026-06-03", "SP", "3", "1", "2", "9", "2", 2026, 6),
+        ("4", "2026-06-04", "SP", "4", "1", "2", "9", "2", 2026, 6),
+        ("5", "2026-06-05", "SP", "9", "1", "2", "9", "2", 2026, 6),
+        ("6", "2026-05-01", "SP", "1", "1", "2", "9", "2", 2026, 5),
+        ("7", "2026-05-02", "SP", "2", "1", "2", "9", "2", 2026, 5),
+        ("8", "2026-07-01", "SP", "1", "1", "2", "9", "2", 2026, 7),
+        ("9", "2026-07-02", "SP", "2", "1", "2", "9", "2", 2026, 7),
+    ]
+    connection.executemany(
+        """
+        INSERT INTO srag_notificacoes VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        rows,
+    )
+    connection.close()
+    return db_path
+
+
+@pytest.fixture
+def metrics_service(metrics_db) -> SRAGMetrics:
+    return SRAGMetrics(duckdb_path=metrics_db, table_name="srag_notificacoes")

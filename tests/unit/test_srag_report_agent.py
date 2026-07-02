@@ -1,0 +1,86 @@
+from app.services.srag_report_agent import SragReportAgent
+
+
+class FakeTool:
+    def __init__(self, response: str) -> None:
+        self.response = response
+        self.calls = []
+
+    def invoke(self, payload):
+        self.calls.append(payload)
+        return self.response
+
+
+class FakeMetricsService:
+    def __init__(self, response: str) -> None:
+        self.tool = FakeTool(response)
+
+    def as_tool(self):
+        return self.tool
+
+
+class FakeNewsService:
+    def __init__(self, response: str) -> None:
+        self.tool = FakeTool(response)
+
+    def as_tool(self):
+        return self.tool
+
+
+class FakeLLMService:
+    def __init__(self, response: str) -> None:
+        self.response = response
+        self.calls = []
+
+    def ask(self, query: str, system_prompt: str | None = None) -> str:
+        self.calls.append({"query": query, "system_prompt": system_prompt})
+        return self.response
+
+
+def test_generate_executive_summary_orchestrates_tools_and_llm():
+    metrics_service = FakeMetricsService('{"metricas":{"taxa_aumento_casos":{"taxa_aumento_percentual":100.0}}}')
+    news_service = FakeNewsService("Noticias recentes sobre SRAG no Brasil:\n1. Titulo\n   URL: https://gov.br")
+    llm_service = FakeLLMService("Resumo executivo.\nDados oficiais: ...\nNoticias: ...")
+
+    agent = SragReportAgent(
+        llm_service=llm_service,
+        metrics_service=metrics_service,
+        news_service=news_service,
+    )
+
+    response = agent.generate_executive_summary("sp")
+
+    assert response == "Resumo executivo.\nDados oficiais: ...\nNoticias: ..."
+    assert metrics_service.tool.calls == [{"estado": "sp"}]
+    assert news_service.tool.calls == [
+        {
+            "query": "Busca noticias recentes sobre SRAG (Sindrome Respiratoria Aguda Grave) no Brasil.\n\n"
+            "A ferramenta usa a Tavily API para coletar noticias relevantes e\n"
+            "retorna um resumo textual das principais manchetes e URLs.\n\n"
+            "Restricoes (guardrails):\n"
+            "- Apenas pesquisas relacionadas a SRAG ou sindromes respiratorias.\n"
+            "- Ignora conteudos fora do Brasil.\n"
+            "- Evita termos explicitos, preconceituosos ou politicos.\n"
+            '- Noticias com algum desses termos devem ser evitados: "porn", "sexo", "violencia", "racismo", "politica", "celebridade",\n'
+            '  "guerra", "crime", "assassinato", "terrorismo"\n'
+        }
+    ]
+    assert "Estado consultado: SP" in llm_service.calls[0]["query"]
+    assert "Dados oficiais da API SRAG:" in llm_service.calls[0]["query"]
+    assert "Noticias recentes coletadas:" in llm_service.calls[0]["query"]
+    assert "Dados oficiais" in llm_service.calls[0]["system_prompt"]
+    assert "Noticias" in llm_service.calls[0]["system_prompt"]
+
+
+def test_generate_executive_summary_limits_output_to_1500_chars():
+    long_text = "A" * 1800
+    agent = SragReportAgent(
+        llm_service=FakeLLMService(long_text),
+        metrics_service=FakeMetricsService("{}"),
+        news_service=FakeNewsService("Nenhuma noticia relevante sobre SRAG no Brasil foi encontrada."),
+    )
+
+    response = agent.generate_executive_summary("BRASIL")
+
+    assert len(response) <= 1500
+    assert response.endswith("...")
