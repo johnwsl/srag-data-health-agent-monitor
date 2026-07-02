@@ -21,7 +21,7 @@ API em FastAPI para ingestão, tratamento e disponibilização de dados de **SRA
 | `POST` | `/datasets/pipeline` | Download + ETL (fluxo completo) |
 | `GET` | `/metrics/{estado}` | Retorna as 4 métricas SRAG para uma UF ou `BRASIL` |
 
-Documentação interativa: `http://localhost:8000/docs`
+Documentação interativa (Swagger): [http://localhost:8000/docs](http://localhost:8000/docs)
 
 ### Exemplo de consulta de métricas
 
@@ -81,13 +81,15 @@ curl http://localhost:8000/health
 
 Resposta esperada: `{"status":"ok"}`
 
+Documentação da API: [http://localhost:8000/docs](http://localhost:8000/docs)
+
 ### 4. Executar o pipeline de dados
 
 ```bash
 curl -X POST http://localhost:8000/datasets/pipeline
 ```
 
-Ou acesse `http://localhost:8000/docs` e execute `POST /datasets/pipeline` pela interface Swagger.
+Ou acesse a [documentação interativa da API](http://localhost:8000/docs) e execute `POST /datasets/pipeline` pela interface Swagger.
 
 ### 5. Abrir o dashboard
 
@@ -149,6 +151,8 @@ pytest
 A suíte inclui **44 testes** cobrindo download, ETL, cálculo de métricas e endpoint `/metrics/{estado}`.
 
 ## Documentação
+
+- **API (Swagger UI):** [http://localhost:8000/docs](http://localhost:8000/docs)
 
 Informações mais detalhadas estão na pasta [`docs/`](docs/):
 

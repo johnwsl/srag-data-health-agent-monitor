@@ -6,8 +6,10 @@ if str(_PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT))
 
 import httpx
+import plotly.graph_objects as go
 from shiny import reactive
 from shiny.express import input, render, ui
+from shinywidgets import render_plotly
 
 from shiny_app.constants import (
     API_BASE_URL,
@@ -98,6 +100,9 @@ ui.tags.style(
     .srag-metrics-table .dataframe tbody td {
         font-size: 0.875rem;
         vertical-align: middle;
+    }
+    .srag-charts-section {
+        margin-top: 1.25rem;
     }
     """
 )
@@ -224,6 +229,34 @@ def metrics_payload() -> dict:
         return {"ok": False, "error": str(error)}
 
 
+def _fetch_series(path: str) -> dict:
+    if pipeline_phase.get() != "ready":
+        return {"ok": False, "error": "Aguardando conclusão do pipeline."}
+    estado = input.estado()
+    try:
+        with httpx.Client(timeout=30.0) as client:
+            response = client.get(_api_url(f"/metrics/{estado}{path}"))
+            response.raise_for_status()
+            return {"ok": True, "data": response.json()}
+    except httpx.HTTPStatusError as error:
+        detail = error.response.text
+        return {"ok": False, "error": f"HTTP {error.response.status_code}: {detail}"}
+    except httpx.RequestError as error:
+        return {"ok": False, "error": f"Falha ao conectar à API: {error}"}
+    except Exception as error:  # noqa: BLE001
+        return {"ok": False, "error": str(error)}
+
+
+@reactive.calc
+def daily_cases_payload() -> dict:
+    return _fetch_series("/casos-diarios")
+
+
+@reactive.calc
+def monthly_cases_payload() -> dict:
+    return _fetch_series("/casos-mensais")
+
+
 def _format_rate(value: float | None, signed: bool = False) -> str:
     if value is None:
         return "N/D"
@@ -271,6 +304,23 @@ def _pipeline_overlay_ui():
         ui.div("Obtendo os dados - espere um momento...", class_="srag-overlay-message"),
         class_="srag-overlay",
     )
+
+
+def _empty_figure(message: str) -> go.Figure:
+    fig = go.Figure()
+    fig.add_annotation(
+        text=message,
+        xref="paper",
+        yref="paper",
+        x=0.5,
+        y=0.5,
+        showarrow=False,
+        font=dict(size=14, color="#6c757d"),
+    )
+    fig.update_xaxes(visible=False)
+    fig.update_yaxes(visible=False)
+    fig.update_layout(height=320, margin=dict(t=30, r=20, l=20, b=20))
+    return fig
 
 
 with ui.div():
@@ -343,3 +393,66 @@ with ui.div(class_="srag-main"):
                 return pd.DataFrame({"mensagem": [result["error"]]})
 
             return pd.DataFrame(_build_metrics_rows(result["data"]))
+
+    with ui.div(class_="srag-charts-section"):
+        with ui.layout_columns(col_widths=(6, 6)):
+            with ui.card(full_screen=True):
+                ui.card_header("Casos diários (últimos 30 dias)")
+
+                @render_plotly
+                def chart_casos_diarios():
+                    result = daily_cases_payload()
+                    if not result["ok"]:
+                        return _empty_figure("Sem dados para exibir.")
+
+                    pontos = result["data"]["pontos"]
+                    fig = go.Figure(
+                        data=[
+                            go.Scatter(
+                                x=[point["data"] for point in pontos],
+                                y=[point["total_casos"] for point in pontos],
+                                mode="lines+markers",
+                                line=dict(color="#0d6efd", width=2),
+                                marker=dict(size=5),
+                                name="Casos",
+                            )
+                        ]
+                    )
+                    fig.update_layout(
+                        height=320,
+                        margin=dict(t=20, r=20, l=20, b=20),
+                        xaxis_title="Data",
+                        yaxis_title="Casos",
+                        showlegend=False,
+                    )
+                    return fig
+
+            with ui.card(full_screen=True):
+                ui.card_header("Casos mensais (últimos 12 meses)")
+
+                @render_plotly
+                def chart_casos_mensais():
+                    result = monthly_cases_payload()
+                    if not result["ok"]:
+                        return _empty_figure("Sem dados para exibir.")
+
+                    pontos = result["data"]["pontos"]
+                    labels = [f"{point['mes']:02d}/{point['ano']}" for point in pontos]
+                    fig = go.Figure(
+                        data=[
+                            go.Bar(
+                                x=labels,
+                                y=[point["total_casos"] for point in pontos],
+                                marker_color="#198754",
+                                name="Casos",
+                            )
+                        ]
+                    )
+                    fig.update_layout(
+                        height=320,
+                        margin=dict(t=20, r=20, l=20, b=20),
+                        xaxis_title="Mês",
+                        yaxis_title="Casos",
+                        showlegend=False,
+                    )
+                    return fig

@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
 
 import duckdb
@@ -16,6 +16,10 @@ from app.config import (
 from app.models.metrics import (
     CaseIncreaseRateMetric,
     CovidVaccinationRateMetric,
+    DailyCasePoint,
+    DailyCasesSeriesResponse,
+    MonthlyCasePoint,
+    MonthlyCasesSeriesResponse,
     MortalityRateMetric,
     UtiOccupancyRateMetric,
 )
@@ -278,6 +282,123 @@ class SRAGMetrics:
 
     def _all_scopes(self) -> list[str | None]:
         return [None, *self.state_codes]
+
+    def _classi_fin_filter_sql(self) -> str:
+        placeholders = ", ".join("?" for _ in self.valid_classi_fin)
+        return f"TRY_CAST(CLASSI_FIN AS INTEGER) IN ({placeholders})"
+
+    def _last_n_months(
+        self,
+        reference: date,
+        months: int,
+    ) -> list[tuple[int, int]]:
+        year, month = reference.year, reference.month
+        result: list[tuple[int, int]] = []
+        for _ in range(months):
+            result.append((year, month))
+            year, month = self._subtract_months(year, month, 1)
+        result.reverse()
+        return result
+
+    def _last_n_days(self, reference: date, days: int) -> list[date]:
+        start = reference - timedelta(days=days - 1)
+        return [start + timedelta(days=offset) for offset in range(days)]
+
+    def casos_ultimos_30_dias(
+        self,
+        reference_date: date | None = None,
+        estado: str | None = None,
+    ) -> DailyCasesSeriesResponse:
+        reference = reference_date or date.today()
+        estado_filter = self._normalize_estado(estado)
+        data_inicio = reference - timedelta(days=29)
+        state_clause, state_parameters = self._state_filter_clause(estado_filter)
+        query = f"""
+            SELECT
+                CAST(DT_NOTIFIC AS DATE) AS data_notific,
+                COUNT(*) AS total_casos
+            FROM "{self.table_name}"
+            WHERE CAST(DT_NOTIFIC AS DATE) >= ?
+              AND CAST(DT_NOTIFIC AS DATE) <= ?
+              AND {self._classi_fin_filter_sql()}
+              {state_clause}
+            GROUP BY 1
+            ORDER BY 1
+        """
+        parameters = [
+            data_inicio,
+            reference,
+            *self.valid_classi_fin,
+            *state_parameters,
+        ]
+
+        connection = duckdb.connect(str(self.duckdb_path), read_only=True)
+        try:
+            rows = connection.execute(query, parameters).fetchall()
+        finally:
+            connection.close()
+
+        counts = {row[0]: int(row[1]) for row in rows}
+        pontos = [
+            DailyCasePoint(data=day, total_casos=counts.get(day, 0))
+            for day in self._last_n_days(reference, 30)
+        ]
+
+        return DailyCasesSeriesResponse(
+            sg_uf_not=self._metric_scope(estado_filter),
+            data_inicio=data_inicio,
+            data_fim=reference,
+            pontos=pontos,
+        )
+
+    def casos_ultimos_12_meses(
+        self,
+        reference_date: date | None = None,
+        estado: str | None = None,
+    ) -> MonthlyCasesSeriesResponse:
+        reference = reference_date or date.today()
+        estado_filter = self._normalize_estado(estado)
+        months = self._last_n_months(reference, 12)
+        state_clause, state_parameters = self._state_filter_clause(estado_filter)
+        month_filters = " OR ".join("(ANO_NOTIFIC = ? AND MES_NOTIFIC = ?)" for _ in months)
+        query = f"""
+            SELECT
+                ANO_NOTIFIC,
+                MES_NOTIFIC,
+                COUNT(*) AS total_casos
+            FROM "{self.table_name}"
+            WHERE ({month_filters})
+              AND {self._classi_fin_filter_sql()}
+              {state_clause}
+            GROUP BY ANO_NOTIFIC, MES_NOTIFIC
+            ORDER BY ANO_NOTIFIC, MES_NOTIFIC
+        """
+        parameters: list[object] = []
+        for year, month in months:
+            parameters.extend([year, month])
+        parameters.extend(self.valid_classi_fin)
+        parameters.extend(state_parameters)
+
+        connection = duckdb.connect(str(self.duckdb_path), read_only=True)
+        try:
+            rows = connection.execute(query, parameters).fetchall()
+        finally:
+            connection.close()
+
+        counts = {(int(year), int(month)): int(total) for year, month, total in rows}
+        pontos = [
+            MonthlyCasePoint(
+                ano=year,
+                mes=month,
+                total_casos=counts.get((year, month), 0),
+            )
+            for year, month in months
+        ]
+
+        return MonthlyCasesSeriesResponse(
+            sg_uf_not=self._metric_scope(estado_filter),
+            pontos=pontos,
+        )
 
     def taxa_aumento_casos(
         self,

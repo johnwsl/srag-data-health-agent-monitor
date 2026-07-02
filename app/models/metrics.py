@@ -1,3 +1,4 @@
+from datetime import date
 from pydantic import BaseModel, Field
 
 
@@ -63,3 +64,26 @@ class SRAGMetricsResponse(BaseModel):
     taxa_vacinacao_populacao: CovidVaccinationRateMetric = Field(
         description="Taxa de vacinação da população."
     )
+
+
+class DailyCasePoint(BaseModel):
+    data: date = Field(description="Data da notificação.")
+    total_casos: int = Field(description="Total de casos notificados no dia.")
+
+
+class DailyCasesSeriesResponse(BaseModel):
+    sg_uf_not: str = Field(description="Sigla da UF ou BRASIL para todo o Brasil.")
+    data_inicio: date = Field(description="Primeiro dia da série (inclusivo).")
+    data_fim: date = Field(description="Último dia da série (inclusivo).")
+    pontos: list[DailyCasePoint] = Field(description="Contagem diária de casos.")
+
+
+class MonthlyCasePoint(BaseModel):
+    ano: int = Field(description="Ano de notificação.")
+    mes: int = Field(description="Mês de notificação.")
+    total_casos: int = Field(description="Total de casos notificados no mês.")
+
+
+class MonthlyCasesSeriesResponse(BaseModel):
+    sg_uf_not: str = Field(description="Sigla da UF ou BRASIL para todo o Brasil.")
+    pontos: list[MonthlyCasePoint] = Field(description="Contagem mensal de casos.")

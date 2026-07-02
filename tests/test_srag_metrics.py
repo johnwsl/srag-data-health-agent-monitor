@@ -399,3 +399,30 @@ def test_taxa_mortalidade_brasil_e_estados_returns_all_scopes(metrics_service):
     assert len(results) == 28
     assert results[0].sg_uf_not == "BRASIL"
 
+
+def test_casos_ultimos_30_dias_returns_complete_series(metrics_service):
+    result = metrics_service.casos_ultimos_30_dias(reference_date=date(2026, 7, 15))
+
+    assert result.sg_uf_not == "BRASIL"
+    assert result.data_inicio == date(2026, 6, 16)
+    assert result.data_fim == date(2026, 7, 15)
+    assert len(result.pontos) == 30
+
+    counts = {point.data: point.total_casos for point in result.pontos}
+    assert counts[date(2026, 7, 1)] == 1
+    assert counts[date(2026, 7, 2)] == 1
+    assert counts[date(2026, 6, 20)] == 0
+
+
+def test_casos_ultimos_12_meses_returns_complete_series(metrics_service):
+    result = metrics_service.casos_ultimos_12_meses(reference_date=date(2026, 7, 15))
+
+    assert result.sg_uf_not == "BRASIL"
+    assert len(result.pontos) == 12
+
+    counts = {(point.ano, point.mes): point.total_casos for point in result.pontos}
+    assert counts[(2026, 6)] == 4
+    assert counts[(2026, 5)] == 2
+    assert counts[(2026, 7)] == 2
+    assert counts[(2025, 8)] == 0
+

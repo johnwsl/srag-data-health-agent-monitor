@@ -1,6 +1,10 @@
 from fastapi import HTTPException, status
 
-from app.models.metrics import SRAGMetricsResponse
+from app.models.metrics import (
+    DailyCasesSeriesResponse,
+    MonthlyCasesSeriesResponse,
+    SRAGMetricsResponse,
+)
 from app.services.srag_metrics import SRAGMetrics
 
 
@@ -28,3 +32,23 @@ class MetricsController:
             taxa_ocupacao_uti=taxa_ocupacao_uti,
             taxa_vacinacao_populacao=taxa_vacinacao_populacao,
         )
+
+    def get_daily_cases(self, estado: str) -> DailyCasesSeriesResponse:
+        estado = estado.upper()
+        try:
+            return self.srag_metrics.casos_ultimos_30_dias(estado=estado)
+        except ValueError as error:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail=str(error),
+            ) from error
+
+    def get_monthly_cases(self, estado: str) -> MonthlyCasesSeriesResponse:
+        estado = estado.upper()
+        try:
+            return self.srag_metrics.casos_ultimos_12_meses(estado=estado)
+        except ValueError as error:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail=str(error),
+            ) from error
