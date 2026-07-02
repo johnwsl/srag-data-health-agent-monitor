@@ -13,6 +13,12 @@ services:
       API_HOST: 0.0.0.0
       RAW_DATA_DIR: /app/raw_data
       DUCKDB_PATH: /app/data/srag.duckdb
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
     restart: unless-stopped
 
   dashboard:
@@ -26,6 +32,12 @@ services:
     environment:
       API_BASE_URL: http://api:8000
       PYTHONPATH: /app
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
     depends_on:
       api:
         condition: service_healthy

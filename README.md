@@ -181,6 +181,36 @@ docker compose down
 | `api` | `srag-api` | `8000` | API FastAPI |
 | `dashboard` | `srag-dashboard` | `8080` | Dashboard Shiny |
 
+### Logs
+
+A aplicação usa o módulo **`logging`** do Python e envia registros para **stdout**. Com Docker, o driver **`json-file`** persiste esses logs nos arquivos internos do daemon (até ~50 MB por container: 5 arquivos × 10 MB).
+
+Os logs incluem startup da API, requisições HTTP e eventos do pipeline (ETL, erros, avisos). O nível de verbosidade é controlado pela variável `LOG_LEVEL` no `.env` (padrão: `INFO`).
+
+Para consultar os logs:
+
+```bash
+# API — todas as linhas
+docker logs srag-api
+
+# API — acompanhar em tempo real
+docker logs -f srag-api
+
+# API — últimas 50 linhas
+docker logs srag-api --tail 50
+
+# Dashboard
+docker logs srag-dashboard
+```
+
+Exemplo de saída:
+
+```
+2026-07-02 19:15:05 | INFO     | app.main | API iniciada
+2026-07-02 19:15:09 | INFO     | app.request | GET /health 200 4.40ms
+2026-07-02 19:15:12 | ERROR    | app.services.etl_service | Nenhum arquivo CSV encontrado em /app/raw_data
+```
+
 ## Executando localmente o dashboard
 
 Com a API em execução na porta 8000:

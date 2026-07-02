@@ -1,3 +1,4 @@
+import logging
 from pathlib import Path
 
 import duckdb
@@ -12,6 +13,8 @@ from app.config import (
     ETL_TABLE_NAME,
     RAW_DATA_DIR,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class EtlService:
@@ -123,8 +126,10 @@ class EtlService:
     def run(self) -> dict:
         csv_files = self._list_csv_files()
         if not csv_files:
+            logger.error("Nenhum arquivo CSV encontrado em %s", self.raw_data_dir)
             raise FileNotFoundError(f"Nenhum arquivo CSV encontrado em {self.raw_data_dir}.")
 
+        logger.info("Iniciando ETL com %d arquivo(s) CSV", len(csv_files))
         merged = self._merge_datasets(csv_files)
         rows_before_filter = len(merged)
 
@@ -143,6 +148,12 @@ class EtlService:
         filled = self._fill_missing_values(selected)
         transformed = self._add_notification_period(filled)
         self._save_to_duckdb(transformed)
+
+        logger.info(
+            "ETL concluído: %d linhas salvas na tabela %s",
+            len(transformed),
+            self.table_name,
+        )
 
         return {
             "files_merged": [file.name for file in csv_files],

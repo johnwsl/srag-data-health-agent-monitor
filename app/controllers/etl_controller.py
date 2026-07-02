@@ -1,8 +1,12 @@
+import logging
+
 from fastapi import HTTPException, status
 
 from app.models.etl import EtlResponse
 from app.models.pipeline import PipelineStatusResponse
 from app.services.etl_service import EtlService
+
+logger = logging.getLogger(__name__)
 
 
 class EtlController:
@@ -17,16 +21,19 @@ class EtlController:
         try:
             result = self.etl_service.run()
         except FileNotFoundError as exc:
+            logger.warning("ETL interrompido: %s", exc)
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=str(exc),
             ) from exc
         except ValueError as exc:
+            logger.warning("ETL rejeitado por dados inválidos: %s", exc)
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail=str(exc),
             ) from exc
         except Exception as exc:
+            logger.exception("Falha inesperada no ETL")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f"Falha ao executar o ETL: {exc}",

@@ -7,6 +7,8 @@ load_dotenv()
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+LOG_LEVEL = os.environ.get("LOG_LEVEL", "INFO").upper()
+
 API_HOST = os.environ["API_HOST"]
 API_PORT = int(os.environ["API_PORT"])
 HTTP_TIMEOUT_SECONDS = float(os.environ["HTTP_TIMEOUT_SECONDS"])
