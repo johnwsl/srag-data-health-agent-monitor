@@ -1,12 +1,17 @@
 from fastapi import HTTPException, status
 
 from app.models.etl import EtlResponse
+from app.models.pipeline import PipelineStatusResponse
 from app.services.etl_service import EtlService
 
 
 class EtlController:
     def __init__(self, etl_service: EtlService | None = None):
         self.etl_service = etl_service or EtlService()
+
+    def get_status(self) -> PipelineStatusResponse:
+        status = self.etl_service.get_status()
+        return PipelineStatusResponse(**status)
 
     def run_etl(self) -> EtlResponse:
         try:

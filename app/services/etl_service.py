@@ -84,6 +84,42 @@ class EtlService:
         finally:
             connection.close()
 
+    def get_status(self) -> dict:
+        if not self.duckdb_path.exists():
+            return {
+                "ready": False,
+                "message": "Banco de dados SRAG não encontrado. Execute o pipeline.",
+                "row_count": 0,
+            }
+
+        connection = duckdb.connect(str(self.duckdb_path), read_only=True)
+        try:
+            row = connection.execute(
+                f'SELECT COUNT(*) FROM "{self.table_name}"'
+            ).fetchone()
+        except duckdb.CatalogException:
+            return {
+                "ready": False,
+                "message": "Tabela SRAG não encontrada. Execute o pipeline.",
+                "row_count": 0,
+            }
+        finally:
+            connection.close()
+
+        row_count = int(row[0]) if row else 0
+        if row_count == 0:
+            return {
+                "ready": False,
+                "message": "Nenhum registro SRAG disponível. Execute o pipeline.",
+                "row_count": 0,
+            }
+
+        return {
+            "ready": True,
+            "message": "Dados SRAG disponíveis para consulta.",
+            "row_count": row_count,
+        }
+
     def run(self) -> dict:
         csv_files = self._list_csv_files()
         if not csv_files:

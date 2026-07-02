@@ -32,6 +32,42 @@ ETL_FILL_MISSING_COLUMNS = ["CLASSI_FIN", "EVOLUCAO", "UTI", "VACINA_COV", "VACI
 ETL_DATE_SOURCE_COLUMN = "DT_NOTIFIC"
 ETL_MISSING_VALUE = "9"
 
+SRAG_VALID_CLASSI_FIN = (1, 2, 3, 4)
+SRAG_EVOLUCAO_OBITO = 2
+SRAG_UTI_INTERNADO = 1
+SRAG_VACINA_COV_VACINADO = 1
+
+SRAG_BRASIL_CODE = "BRASIL"
+SRAG_STATE_CODES: tuple[str, ...] = (
+    "AC",
+    "AL",
+    "AM",
+    "AP",
+    "BA",
+    "CE",
+    "DF",
+    "ES",
+    "GO",
+    "MA",
+    "MG",
+    "MS",
+    "MT",
+    "PA",
+    "PB",
+    "PE",
+    "PI",
+    "PR",
+    "RJ",
+    "RN",
+    "RO",
+    "RR",
+    "RS",
+    "SC",
+    "SE",
+    "SP",
+    "TO",
+)
+
 DATASET_NAME_2019 = os.environ["DATASET_NAME_2019"]
 DATASET_URL_2019 = os.environ["DATASET_URL_2019"]
 DATASET_NAME_2025 = os.environ["DATASET_NAME_2025"]

@@ -2,6 +2,7 @@ from fastapi import FastAPI
 
 from app.views.dataset_routes import router as dataset_router
 from app.views.etl_routes import router as etl_router
+from app.views.metrics_routes import router as metrics_router
 from app.views.pipeline_routes import router as pipeline_router
 
 app = FastAPI(
@@ -13,6 +14,7 @@ app = FastAPI(
 app.include_router(dataset_router)
 app.include_router(etl_router)
 app.include_router(pipeline_router)
+app.include_router(metrics_router)
 
 
 @app.get("/health")

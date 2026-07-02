@@ -14,3 +14,19 @@ services:
       RAW_DATA_DIR: /app/raw_data
       DUCKDB_PATH: /app/data/srag.duckdb
     restart: unless-stopped
+
+  dashboard:
+    build: .
+    container_name: srag-dashboard
+    command: shiny run shiny_app/dashboard.py --host 0.0.0.0 --port 8080
+    ports:
+      - "${DASHBOARD_PORT:-8080}:8080"
+    env_file:
+      - .env
+    environment:
+      API_BASE_URL: http://api:8000
+      PYTHONPATH: /app
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped

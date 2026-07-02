@@ -1,6 +1,6 @@
 # Pipeline de Dados SRAG
 
-Este documento descreve o processo de **pipeline** do projeto *SRAG Data Health Agent Monitor*: a orquestração que combina o **download** dos datasets do [Portal de Dados Abertos do SUS](https://dadosabertos.saude.gov.br/dataset/srag-2019-a-2026) com o **ETL** (Extract, Transform, Load) que prepara os dados para consulta no DuckDB.
+Este documento descreve o processo de **pipeline** do projeto *SRAG Data Health Agent Monitor*: a orquestração que combina o **download** dos datasets do [Portal de Dados Abertos do SUS](https://dadosabertos.saude.gov.br/dataset/srag-2019-a-2026) com o **ETL** (Extract, Transform, Load) que prepara os dados para consulta no DuckDB e cálculo de métricas.
 
 ---
 
@@ -30,16 +30,19 @@ flowchart LR
     B --> C[raw_data/*.csv]
     C --> D[ETL]
     D --> E[DuckDB]
-    E --> F[Métricas / Agentes]
+    E --> F[SRAGMetrics]
+    F --> G[GET /metrics/estado]
+    G --> H[Agentes de IA / Relatórios]
 ```
 
-Existem três formas de executar esse fluxo:
+### Endpoints do fluxo de dados
 
 | Endpoint | Descrição |
 |----------|-----------|
 | `POST /datasets/pipeline` | Fluxo completo (recomendado) |
-| `POST /datasets/download/datasets` | Apenas download |
+| `POST /datasets/download` | Apenas download |
 | `POST /datasets/etl` | Apenas ETL |
+| `GET /metrics/{estado}` | Consulta das 4 métricas SRAG (requer ETL executado) |
 
 O endpoint de pipeline **não duplica lógica**: ele orquestra os controllers de download e ETL em sequência, mantendo cada etapa independente e testável.
 
@@ -56,6 +59,8 @@ sequenceDiagram
     participant DatasetService
     participant EtlService
     participant Disco as raw_data / DuckDB
+    participant MetricsController
+    participant SRAGMetrics
 
     Cliente->>PipelineController: POST /datasets/pipeline
     PipelineController->>DatasetController: download_datasets()
@@ -71,17 +76,28 @@ sequenceDiagram
     EtlController-->>PipelineController: EtlResponse
 
     PipelineController-->>Cliente: PipelineResponse
+
+    Cliente->>MetricsController: GET /metrics/SP
+    MetricsController->>SRAGMetrics: taxa_*()
+    SRAGMetrics->>Disco: consulta DuckDB
+    SRAGMetrics-->>MetricsController: métricas
+    MetricsController-->>Cliente: SRAGMetricsResponse
 ```
 
 ### Camadas envolvidas
 
 | Camada | Arquivo | Papel |
 |--------|---------|-------|
-| Rota | `app/views/pipeline_routes.py` | Expõe `POST /datasets/pipeline` |
+| Rota (pipeline) | `app/views/pipeline_routes.py` | Expõe `POST /datasets/pipeline` |
+| Rota (download) | `app/views/dataset_routes.py` | Expõe `POST /datasets/download` |
+| Rota (ETL) | `app/views/etl_routes.py` | Expõe `POST /datasets/etl` |
+| Rota (métricas) | `app/views/metrics_routes.py` | Expõe `GET /metrics/{estado}` |
 | Controller | `app/controllers/pipeline_controller.py` | Orquestra download → ETL |
+| Controller | `app/controllers/metrics_controller.py` | Orquestra as 4 métricas |
 | Serviço (download) | `app/services/dataset_service.py` | Baixa e persiste CSVs |
 | Serviço (ETL) | `app/services/etl_service.py` | Transforma e grava no DuckDB |
-| Configuração | `app/config.py` + `.env` | URLs, caminhos e colunas |
+| Serviço (métricas) | `app/services/srag_metrics.py` | Calcula métricas a partir do DuckDB |
+| Configuração | `app/config.py` + `.env` | URLs, caminhos, colunas e constantes SRAG |
 
 ---
 
@@ -252,6 +268,53 @@ UTI, VACINA_COV, VACINA, ANO_NOTIFIC, MES_NOTIFIC
 
 ---
 
+## Etapa 3 — Consulta de métricas
+
+Após o ETL, os dados no DuckDB alimentam o serviço `SRAGMetrics`, exposto pela API em `GET /metrics/{estado}`.
+
+### Parâmetro `estado`
+
+| Valor | Escopo |
+|-------|--------|
+| `BRASIL` | Todo o país (agregação nacional) |
+| Sigla da UF | `AC`, `AL`, `AM`, `AP`, `BA`, `CE`, `DF`, `ES`, `GO`, `MA`, `MG`, `MS`, `MT`, `PA`, `PB`, `PE`, `PI`, `PR`, `RJ`, `RN`, `RO`, `RR`, `RS`, `SC`, `SE`, `SP`, `TO` |
+
+A sigla é normalizada para maiúsculas (`/metrics/sp` equivale a `/metrics/SP`). UF inválida retorna HTTP **422**.
+
+### Métricas retornadas
+
+| Campo na resposta | Descrição |
+|-------------------|-----------|
+| `taxa_aumento_casos` | Variação percentual de casos entre dois meses |
+| `taxa_mortalidade` | Letalidade no período |
+| `taxa_ocupacao_uti` | Percentual de casos com UTI |
+| `taxa_vacinacao_populacao` | Percentual de casos vacinados contra COVID |
+
+Detalhes de fórmulas, filtros e cenários especiais estão em [`metricas_srag.md`](metricas_srag.md).
+
+### Exemplo de resposta
+
+```json
+{
+  "sg_uf_not": "SP",
+  "taxa_aumento_casos": {
+    "sg_uf_not": "SP",
+    "mes_atual_ano": 2026,
+    "mes_atual_mes": 6,
+    "mes_anterior_ano": 2026,
+    "mes_anterior_mes": 5,
+    "casos_mes_atual": 1200,
+    "casos_mes_anterior": 980,
+    "taxa_aumento_percentual": 22.45
+  },
+  "taxa_mortalidade": { "..." : "..." },
+  "taxa_ocupacao_uti": { "..." : "..." },
+  "taxa_vacinacao_populacao": { "..." : "..." }
+}
+```
+
+---
+
 ## Resposta do pipeline completo
 
 O endpoint `POST /datasets/pipeline` retorna um objeto unificado com o resultado das duas etapas:
@@ -281,34 +344,50 @@ O endpoint `POST /datasets/pipeline` retorna um objeto unificado com o resultado
 1. Inicie a aplicação (`docker compose up` ou `uvicorn app.main:app`).
 2. Acesse `http://localhost:8000/docs`.
 3. Execute `POST /datasets/pipeline`.
+4. Consulte `GET /metrics/BRASIL` ou `GET /metrics/SP`.
 
 ### Via curl
 
 ```bash
+# Pipeline completo
 curl -X POST http://localhost:8000/datasets/pipeline
+
+# Métricas
+curl http://localhost:8000/metrics/BRASIL
+curl http://localhost:8000/metrics/SP
 ```
 
 ### Fluxo manual (etapas separadas)
 
 ```bash
 # Apenas download
-curl -X POST http://localhost:8000/datasets/download/datasets
+curl -X POST http://localhost:8000/datasets/download
 
 # Apenas ETL (requer CSVs em raw_data)
 curl -X POST http://localhost:8000/datasets/etl
+
+# Métricas (requer ETL executado)
+curl http://localhost:8000/metrics/RJ
 ```
 
 ---
 
 ## Testes automatizados
 
-O projeto inclui testes unitários para download e ETL em `tests/`:
+O projeto inclui **44 testes** em `tests/`:
+
+| Arquivo | Cobertura |
+|---------|-----------|
+| `test_dataset_service.py` | Download de datasets |
+| `test_etl_service.py` | Pipeline de ETL |
+| `test_srag_metrics.py` | Cálculo de métricas (incluindo por UF) |
+| `test_metrics_routes.py` | Endpoint `GET /metrics/{estado}` |
 
 ```bash
 pytest tests/ -v
 ```
 
-Os testes de download usam `httpx.MockTransport` (sem internet). Os testes de ETL usam CSVs pequenos de fixture e banco DuckDB temporário.
+Os testes de download usam `httpx.MockTransport` (sem internet). Os testes de ETL e métricas usam bancos DuckDB temporários.
 
 ---
 
@@ -321,16 +400,18 @@ srag-data-health-agent-monitor/
 │   └── INFLUD25-29-06-2026.csv    ← download
 └── data/
     └── srag.duckdb                ← ETL (tabela srag_notificacoes)
+                                   ← consultado por GET /metrics/{estado}
 ```
 
 ---
 
 ## Próximos passos
 
-Com os dados no DuckDB, a aplicação está pronta para:
+Com os dados no DuckDB e as métricas expostas pela API, a aplicação está pronta para:
 
-- Consultas SQL para métricas (mortalidade, UTI, vacinação, etc.)
-- Integração com agentes de IA via tools
-- Geração de relatórios e gráficos
+- Integração com **agentes de IA** via tools que consomem `/metrics/{estado}`
+- Geração de **relatórios** automatizados por estado ou nacional
+- **Gráficos** de casos diários e mensais (a implementar)
+- Endpoints adicionais para consulta em lote (ex.: todas as UFs de uma vez)
 
-O pipeline é a **base de dados** sobre a qual o restante da solução será construído.
+O pipeline e as métricas formam a **base de dados e indicadores** sobre os quais o restante da solução será construído.
