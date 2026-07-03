@@ -17,7 +17,7 @@ O sistema entrega quatro blocos principais:
 
 ## O que o sistema faz
 
-1. **Download** — Baixa três arquivos CSV de SRAG (2019, 2025 e 2026) a partir de URLs configuradas no `.env` e salva em `raw_data/`. Arquivos já presentes são reutilizados, sem novo download.
+1. **Download** — Baixa três arquivos CSV de SRAG (2019 - 2026) a partir de URLs configuradas no `.env` e salva em `raw_data/`. Arquivos já presentes são reutilizados, sem novo download.
 2. **ETL** — Faz merge dos CSVs, seleciona colunas relevantes, filtra registros inválidos, trata valores ausentes e deriva variáveis de período (`ANO_NOTIFIC`, `MES_NOTIFIC`).
 3. **Persistência** — Grava o dataset tratado no DuckDB (`data/srag.duckdb`), na tabela `srag_notificacoes`.
 4. **Pipeline** — Orquestra download + ETL em uma única chamada.
