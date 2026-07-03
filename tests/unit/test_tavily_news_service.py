@@ -1,6 +1,6 @@
 import pytest
 
-from app.services.tavily_news_service import SRAG_NEWS_QUERY, TavilyNewsLangChainService
+from app.services.tavily_news_service import TAVILY_SEARCH_QUERY, TavilyNewsLangChainService
 
 
 class FakeTavilySearch:
@@ -29,7 +29,7 @@ def test_busca_noticias_uses_default_query():
     service = TavilyNewsLangChainService(tavily_search_tool=fake_tool)
     response = service.buscar_noticias()
 
-    assert fake_tool.calls == [{"query": SRAG_NEWS_QUERY}]
+    assert fake_tool.calls == [{"query": TAVILY_SEARCH_QUERY}]
     assert "Noticias recentes sobre SRAG no Brasil:" in response
     assert "Brasil monitora aumento de casos de SRAG" in response
     assert "https://g1.globo.com/saude/noticia-srag-brasil" in response
@@ -100,7 +100,7 @@ def test_as_tool_invokes_news_search():
 
     service = TavilyNewsLangChainService(tavily_search_tool=fake_tool)
     tool = service.as_tool()
-    response = tool.invoke({"query": SRAG_NEWS_QUERY})
+    response = tool.invoke({})
 
     assert tool.name == "buscar_noticias_srag"
     assert "Brasil monitora aumento de casos de SRAG" in response

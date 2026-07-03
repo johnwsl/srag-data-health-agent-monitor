@@ -1,6 +1,6 @@
 from app.services.openai_langchain_service import OpenAILangChainService
 from app.services.srag_metrics_api_service import SragMetricsApiLangChainService
-from app.services.tavily_news_service import SRAG_NEWS_QUERY, TavilyNewsLangChainService
+from app.services.tavily_news_service import TavilyNewsLangChainService
 
 
 class SragReportAgent:
@@ -24,7 +24,7 @@ class SragReportAgent:
         news_tool = self.news_service.as_tool()
 
         official_data = metrics_tool.invoke({"estado": estado})
-        news_data = news_tool.invoke({"query": SRAG_NEWS_QUERY})
+        news_data = news_tool.invoke({})
 
         system_prompt = (
             "Voce e um analista de saude publica. Produza um resumo executivo em portugues, "

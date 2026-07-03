@@ -1,14 +1,11 @@
 import os
 from collections.abc import Sequence
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
-SRAG_NEWS_QUERY = """Busca noticias recentes sobre SRAG (Sindrome Respiratoria Aguda Grave) no Brasil.
+TAVILY_SEARCH_QUERY = "SRAG sindrome respiratoria aguda grave Brasil noticias"
 
-A ferramenta usa a Tavily API para coletar noticias relevantes e
-retorna um resumo textual das principais manchetes e URLs.
-
-Restricoes (guardrails):
+SRAG_NEWS_GUARDRAILS = """Restricoes (guardrails):
 - Apenas pesquisas relacionadas a SRAG ou sindromes respiratorias.
 - Ignora conteudos fora do Brasil.
 - Evita termos explicitos, preconceituosos ou politicos.
@@ -31,10 +28,7 @@ BLOCKED_TERMS = (
 
 
 class TavilyNewsToolInput(BaseModel):
-    query: str = Field(
-        default=SRAG_NEWS_QUERY,
-        description="Consulta de noticias sobre SRAG no Brasil. Use a query padrao da ferramenta.",
-    )
+    """Entrada vazia; a consulta enviada a Tavily e fixa e otimizada para busca de noticias."""
 
 
 class TavilyNewsLangChainService:
@@ -73,8 +67,8 @@ class TavilyNewsLangChainService:
             include_domains=["gov.br", "saude.gov.br", "g1.globo.com", "uol.com.br", "cnnbrasil.com.br"],
         )
 
-    def buscar_noticias(self, query: str = SRAG_NEWS_QUERY) -> str:
-        response = self._tool.invoke({"query": query})
+    def buscar_noticias(self) -> str:
+        response = self._tool.invoke({"query": TAVILY_SEARCH_QUERY})
         results = self._extract_results(response)
         filtered_results = self._filter_results(results)
 
@@ -140,7 +134,8 @@ class TavilyNewsLangChainService:
             name="buscar_noticias_srag",
             description=(
                 "Busca noticias recentes sobre SRAG no Brasil usando Tavily Search e retorna "
-                "um resumo textual com manchetes e URLs relevantes, respeitando guardrails de conteudo."
+                "um resumo textual com manchetes e URLs relevantes, respeitando guardrails de conteudo.\n\n"
+                f"{SRAG_NEWS_GUARDRAILS}"
             ),
             args_schema=TavilyNewsToolInput,
         )

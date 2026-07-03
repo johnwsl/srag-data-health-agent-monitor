@@ -59,19 +59,7 @@ def test_generate_executive_summary_orchestrates_tools_and_llm():
     assert response == "Resumo executivo.\nDados oficiais: ...\nNoticias: ..."
     assert metrics_service.ensure_calls == 1
     assert metrics_service.tool.calls == [{"estado": "sp"}]
-    assert news_service.tool.calls == [
-        {
-            "query": "Busca noticias recentes sobre SRAG (Sindrome Respiratoria Aguda Grave) no Brasil.\n\n"
-            "A ferramenta usa a Tavily API para coletar noticias relevantes e\n"
-            "retorna um resumo textual das principais manchetes e URLs.\n\n"
-            "Restricoes (guardrails):\n"
-            "- Apenas pesquisas relacionadas a SRAG ou sindromes respiratorias.\n"
-            "- Ignora conteudos fora do Brasil.\n"
-            "- Evita termos explicitos, preconceituosos ou politicos.\n"
-            '- Noticias com algum desses termos devem ser evitados: "porn", "sexo", "violencia", "racismo", "politica", "celebridade",\n'
-            '  "guerra", "crime", "assassinato", "terrorismo"\n'
-        }
-    ]
+    assert news_service.tool.calls == [{}]
     assert "Estado consultado: SP" in llm_service.calls[0]["query"]
     assert "Status da pipeline SRAG:" in llm_service.calls[0]["query"]
     assert "Dados oficiais da API SRAG:" in llm_service.calls[0]["query"]
