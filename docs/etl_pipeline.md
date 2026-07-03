@@ -155,7 +155,7 @@ Obter os arquivos CSV de SRAG a partir das URLs configuradas no [Portal de Dados
 
 ### Datasets configurados
 
-Por padrão, o sistema baixa **dois arquivos**, definidos no `.env`:
+Por padrão, o sistema baixa **três arquivos**, definidos no `.env`:
 
 | Variável | Exemplo |
 |----------|---------|
@@ -163,6 +163,8 @@ Por padrão, o sistema baixa **dois arquivos**, definidos no `.env`:
 | `DATASET_URL_2019` | URL do CSV de 2019 no portal SUS |
 | `DATASET_NAME_2025` | `INFLUD25-29-06-2026.csv` |
 | `DATASET_URL_2025` | URL do CSV de 2025 no portal SUS |
+| `DATASET_NAME_2026` | `INFLUD26-29-06-2026.csv` |
+| `DATASET_URL_2026` | URL do CSV de 2026 no portal SUS |
 
 ### Como funciona
 
@@ -190,8 +192,8 @@ Por padrão, o sistema baixa **dois arquivos**, definidos no `.env`:
 ```json
 {
   "message": "Download concluído; alguns datasets já estavam presentes.",
-  "total": 2,
-  "successful": 2,
+  "total": 3,
+  "successful": 3,
   "failed": 0,
   "datasets": [
     {
@@ -306,7 +308,8 @@ UTI, VACINA_COV, VACINA, ANO_NOTIFIC, MES_NOTIFIC
   "message": "ETL concluído com sucesso.",
   "files_merged": [
     "INFLUD19-23-03-2026.csv",
-    "INFLUD25-29-06-2026.csv"
+    "INFLUD25-29-06-2026.csv",
+    "INFLUD26-29-06-2026.csv"
   ],
   "rows_before_filter": 385213,
   "rows_after_filter": 385167,
@@ -479,7 +482,8 @@ Os testes de download usam `httpx.MockTransport` (sem internet). Os testes de ET
 srag-data-health-agent-monitor/
 ├── raw_data/
 │   ├── INFLUD19-23-03-2026.csv    ← download
-│   └── INFLUD25-29-06-2026.csv    ← download
+│   ├── INFLUD25-29-06-2026.csv    ← download
+│   └── INFLUD26-29-06-2026.csv    ← download
 └── data/
     └── srag.duckdb                ← ETL (tabela srag_notificacoes)
                                    ← consultado por GET /metrics/{estado}
