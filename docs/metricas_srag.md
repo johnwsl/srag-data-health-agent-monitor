@@ -1,6 +1,6 @@
 # Métricas SRAG
 
-Este documento descreve o cálculo das métricas implementadas na classe `SRAGMetrics` (`app/services/srag_metrics.py`), incluindo regras de período, filtros, escopo geográfico, fórmulas, endpoint da API e cenários especiais.
+Este documento descreve o cálculo das métricas implementadas na classe `SRAGMetrics` (`app/services/srag_metrics.py`), incluindo regras de período, filtros, escopo geográfico, fórmulas, endpoints da API, séries temporais e cenários especiais.
 
 Os dados utilizados vêm da tabela DuckDB `srag_notificacoes`, gerada pelo processo de ETL documentado em [`etl_pipeline.md`](etl_pipeline.md).
 
@@ -15,10 +15,14 @@ flowchart LR
     B --> D[taxa_mortalidade]
     B --> E[taxa_ocupacao_uti]
     B --> F[taxa_vacinacao_populacao]
-    C --> G[GET /metrics/estado]
-    D --> G
-    E --> G
-    F --> G
+    B --> G[casos_ultimos_30_dias]
+    B --> H[casos_ultimos_12_meses]
+    C --> I[GET /metrics/estado]
+    D --> I
+    E --> I
+    F --> I
+    G --> J[GET /metrics/estado/casos-diarios]
+    H --> K[GET /metrics/estado/casos-mensais]
 ```
 
 | Métrica | Método | Pergunta que responde |
@@ -27,16 +31,25 @@ flowchart LR
 | Taxa de mortalidade | `taxa_mortalidade()` | Qual a letalidade entre os casos notificados no período? |
 | Taxa de ocupação de UTI | `taxa_ocupacao_uti()` | Qual percentual de casos precisou de UTI no período? |
 | Taxa de vacinação da população | `taxa_vacinacao_populacao()` | Qual percentual de casos estava vacinado contra COVID no período? |
+| Casos diários | `casos_ultimos_30_dias()` | Como evoluíram os casos dia a dia nos últimos 30 dias? |
+| Casos mensais | `casos_ultimos_12_meses()` | Como evoluíram os casos mês a mês nos últimos 12 meses? |
 
 ---
 
-## Endpoint da API
+## Endpoints da API
 
-As quatro métricas estão disponíveis via HTTP:
+### Métricas agregadas
 
 | Método | Caminho | Descrição |
 |--------|---------|-----------|
 | `GET` | `/metrics/{estado}` | Retorna as 4 métricas para uma UF ou para o Brasil |
+
+### Séries temporais
+
+| Método | Caminho | Descrição |
+|--------|---------|-----------|
+| `GET` | `/metrics/{estado}/casos-diarios` | Contagem diária dos últimos 30 dias |
+| `GET` | `/metrics/{estado}/casos-mensais` | Contagem mensal dos últimos 12 meses |
 
 ### Parâmetro `estado`
 
@@ -55,6 +68,8 @@ A sigla é normalizada para maiúsculas. UF inválida retorna HTTP **422**.
 curl http://localhost:8000/metrics/BRASIL
 curl http://localhost:8000/metrics/SP
 curl http://localhost:8000/metrics/rj
+curl http://localhost:8000/metrics/SP/casos-diarios
+curl http://localhost:8000/metrics/SP/casos-mensais
 ```
 
 ### Resposta (`SRAGMetricsResponse`)
@@ -87,29 +102,29 @@ curl http://localhost:8000/metrics/rj
 }
 ```
 
-### Arquitetura do endpoint
+### Arquitetura dos endpoints
 
 | Camada | Arquivo |
 |--------|---------|
 | Rota | `app/views/metrics_routes.py` |
 | Controller | `app/controllers/metrics_controller.py` |
 | Serviço | `app/services/srag_metrics.py` |
-| Modelo | `app/models/metrics.py` (`SRAGMetricsResponse`) |
+| Modelos | `app/models/metrics.py` (`SRAGMetricsResponse`, `DailyCasesSeriesResponse`, `MonthlyCasesSeriesResponse`) |
 
 ### Dashboard Shiny
 
-As métricas também podem ser visualizadas no dashboard interativo em `shiny_app/app.py` ([Shiny for Python](https://shiny.posit.co/py/)):
+As métricas e séries temporais podem ser visualizadas no dashboard interativo em `shiny_app/dashboard.py` ([Shiny for Python](https://shiny.posit.co/py/)):
 
-- **Docker:** `http://localhost:8080` (serviço `dashboard`)
-- **Local:** `shiny run shiny_app/app.py --host 127.0.0.1 --port 8080`
+- **Docker:** [http://localhost:8080](http://localhost:8080) (serviço `dashboard`)
+- **Local:** `shiny run shiny_app/dashboard.py --host 127.0.0.1 --port 8080`
 
-O dashboard consome a API (`API_BASE_URL`) e exibe cards, gráficos comparativos e tabela detalhada por UF ou `BRASIL`.
+O dashboard consome a API (`API_BASE_URL`) e exibe cards de métricas, gráficos de casos diários e mensais (Plotly) e permite gerar relatório executivo por IA.
 
 ---
 
 ## Escopo geográfico
 
-Todas as métricas aceitam o parâmetro opcional `estado` no serviço `SRAGMetrics`:
+Todas as métricas e séries aceitam o parâmetro opcional `estado` no serviço `SRAGMetrics`:
 
 ```python
 from app.services.srag_metrics import SRAGMetrics
@@ -146,7 +161,7 @@ Cada lista retorna primeiro o escopo nacional (`sg_uf_not = "BRASIL"`), seguido 
 
 ## Regra comum: seleção de meses
 
-Todas as métricas compartilham a mesma lógica para definir **quais meses** entram no cálculo.
+Todas as **métricas agregadas** compartilham a mesma lógica para definir **quais meses** entram no cálculo.
 
 ### 1. Ignorar o mês corrente
 
@@ -215,7 +230,7 @@ Definidas em `app/config.py`:
 
 | Constante | Valor | Uso |
 |-----------|-------|-----|
-| `SRAG_VALID_CLASSI_FIN` | 1, 2, 3, 4 | Filtro da taxa de aumento de casos |
+| `SRAG_VALID_CLASSI_FIN` | 1, 2, 3, 4 | Filtro da taxa de aumento de casos e das séries temporais |
 | `SRAG_EVOLUCAO_OBITO` | 2 | Indica óbito |
 | `SRAG_UTI_INTERNADO` | 1 | Indica internação em UTI |
 | `SRAG_VACINA_COV_VACINADO` | 1 | Indica vacinação COVID |
@@ -452,6 +467,75 @@ taxa = (540 / 900) × 100 = 60%
 
 ---
 
+## 5. Série de casos diários
+
+**Método:** `casos_ultimos_30_dias(estado=None)`
+
+**Endpoint:** `GET /metrics/{estado}/casos-diarios`
+
+### Objetivo
+
+Retornar a contagem diária de casos SRAG nos **últimos 30 dias** (inclusive o dia de referência).
+
+### Período
+
+- `data_inicio` = data de referência − 29 dias
+- `data_fim` = data de referência (padrão: hoje)
+- A série sempre contém **30 pontos**, preenchendo com `0` os dias sem registros
+
+### Filtro
+
+Considera apenas registros com **`CLASSI_FIN` ∈ {1, 2, 3, 4}**.
+
+### Retorno (`DailyCasesSeriesResponse`)
+
+```json
+{
+  "sg_uf_not": "SP",
+  "data_inicio": "2026-06-04",
+  "data_fim": "2026-07-03",
+  "pontos": [
+    { "data": "2026-06-04", "total_casos": 12 },
+    { "data": "2026-06-05", "total_casos": 8 },
+  ]
+}
+```
+
+---
+
+## 6. Série de casos mensais
+
+**Método:** `casos_ultimos_12_meses(estado=None)`
+
+**Endpoint:** `GET /metrics/{estado}/casos-mensais`
+
+### Objetivo
+
+Retornar a contagem mensal de casos SRAG nos **últimos 12 meses** (inclusive o mês de referência).
+
+### Período
+
+- Inclui o mês da data de referência e os 11 meses anteriores
+- A série sempre contém **12 pontos**, preenchendo com `0` os meses sem registros
+
+### Filtro
+
+Considera apenas registros com **`CLASSI_FIN` ∈ {1, 2, 3, 4}**.
+
+### Retorno (`MonthlyCasesSeriesResponse`)
+
+```json
+{
+  "sg_uf_not": "BRASIL",
+  "pontos": [
+    { "ano": 2025, "mes": 8, "total_casos": 4500 },
+    { "ano": 2025, "mes": 9, "total_casos": 4200 }
+  ]
+}
+```
+
+---
+
 ## Cenários especiais
 
 ### Cenário A — Mês corrente ausente na base
@@ -522,7 +606,7 @@ As demais métricas continuam calculando normalmente se `total_casos_2_meses > 0
 - `EVOLUCAO = 9` **não** conta como óbito (só `2` conta)
 - `UTI = 9` **não** conta como UTI (só `1` conta)
 - `VACINA_COV = 9` **não** conta como vacinado (só `1` conta)
-- `CLASSI_FIN = 9` **não** entra na taxa de aumento de casos
+- `CLASSI_FIN = 9` **não** entra na taxa de aumento de casos nem nas séries temporais
 
 ---
 
@@ -546,14 +630,16 @@ As demais métricas continuam calculando normalmente se `total_casos_2_meses > 0
 
 ---
 
-## Comparação das métricas
+## Comparação das métricas e séries
 
-| Métrica | Período | Comparação | Numerador | Denominador | Filtro extra |
+| Indicador | Período | Comparação | Numerador | Denominador | Filtro extra |
 |---------|---------|------------|-----------|-------------|--------------|
 | Aumento de casos | 2 meses | **Mai vs Abr** | diferença entre meses | casos do mês anterior | `CLASSI_FIN` 1–4 |
 | Mortalidade | 2 meses | **Mai + Abr** | `EVOLUCAO = 2` | todos os casos | — |
 | Ocupação UTI | 2 meses | **Mai + Abr** | `UTI = 1` | todos os casos | — |
 | Vacinação | 2 meses | **Mai + Abr** | `VACINA_COV = 1` | todos os casos | — |
+| Casos diários | 30 dias | série contínua | casos por dia | — | `CLASSI_FIN` 1–4 |
+| Casos mensais | 12 meses | série contínua | casos por mês | — | `CLASSI_FIN` 1–4 |
 
 > Na tabela acima, "Mai" e "Abr" representam `mes_atual` e `mes_anterior` **após** a resolução de meses (podem ser outros meses se houver lacunas na base).
 
@@ -563,15 +649,17 @@ As demais métricas continuam calculando normalmente se `total_casos_2_meses > 0
 
 Cada métrica executa queries SQL na tabela `srag_notificacoes`:
 
-| Métrica | Queries |
+| Indicador | Queries |
 |---------|---------|
 | Resolução de meses | 1 (meses distintos disponíveis, com filtro opcional por UF) |
 | Taxa de aumento de casos | 2 (contagem por mês) |
 | Mortalidade | 1 |
 | Ocupação UTI | 1 |
 | Vacinação | 1 |
+| Casos diários | 1 |
+| Casos mensais | 1 |
 
-**Total por escopo:** 5 queries se todas as métricas forem calculadas em sequência (como no endpoint `/metrics/{estado}`).
+**Total por escopo no endpoint `/metrics/{estado}`:** 5 queries (resolução de meses + 4 métricas).
 
 ---
 
@@ -581,9 +669,9 @@ Os cenários acima são cobertos por testes em:
 
 | Arquivo | Testes |
 |---------|--------|
-| `tests/unit/test_srag_metrics.py` | Cálculo, escopo por UF, métodos em lote |
+| `tests/unit/test_srag_metrics.py` | Cálculo, escopo por UF, métodos em lote, séries temporais |
 | `tests/unit/test_metrics_routes.py` | Rotas de métricas com mocks |
-| `tests/integration/test_metrics_routes.py` | Integração real com os endpoints de métricas |
+| `tests/integration/test_metrics_routes.py` | Integração real com métricas e séries temporais |
 
 ```bash
 pytest tests/unit/test_srag_metrics.py tests/unit/test_metrics_routes.py tests/integration/test_metrics_routes.py -v
@@ -591,12 +679,6 @@ pytest tests/unit/test_srag_metrics.py tests/unit/test_metrics_routes.py tests/i
 
 ---
 
-## Próximos passos
+## Integração com o agente de IA
 
-As métricas já estão disponíveis via API e prontas para:
-
-- Integração com **agentes de IA** para geração de relatórios
-- Consumo no dashboard em **http://localhost:8080**
-- Uso pelo endpoint `POST /agents/report`
-- Endpoint de consulta em lote para todas as UFs de uma vez
-- Parâmetro opcional de `reference_date` na API (hoje fixo em “hoje” no serviço)
+O serviço `SragMetricsApiLangChainService` consolida as quatro métricas e as duas séries temporais em uma única chamada (`get_full_metrics_data`), exposta como tool LangChain `consultar_metricas_srag`. Detalhes em [`agente_orquestrador.md`](agente_orquestrador.md).
