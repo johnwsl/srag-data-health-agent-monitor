@@ -524,7 +524,10 @@ with ui.div(class_="srag-main"):
                 result = generate_report_task.result()
                 if not result["ok"]:
                     return ui.p(result["error"], class_="srag-error")
-                return ui.p(result["data"]["resumo_executivo"], class_="srag-report-text")
+                return ui.div(
+                    ui.markdown(result["data"]["resumo_executivo"]),
+                    class_="srag-report-text",
+                )
 
             if task_status == "error":
                 try:
