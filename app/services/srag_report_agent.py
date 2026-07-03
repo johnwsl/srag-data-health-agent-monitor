@@ -11,7 +11,7 @@ class SragReportAgent:
         llm_service: OpenAILangChainService | None = None,
         metrics_service: SragMetricsApiLangChainService | None = None,
         news_service: TavilyNewsLangChainService | None = None,
-        max_chars: int = 1500,
+        max_chars: int = 4000,
     ) -> None:
         self.llm_service = llm_service or OpenAILangChainService()
         self.metrics_service = metrics_service or SragMetricsApiLangChainService()
@@ -28,7 +28,7 @@ class SragReportAgent:
 
         system_prompt = (
             "Voce e um analista de saude publica. Produza um resumo executivo em portugues, "
-            "com no maximo 1500 caracteres, separando claramente 'Dados oficiais' e 'Noticias'. "
+            "com no maximo 4000 caracteres, separando claramente 'Dados oficiais' e 'Noticias'. "
             "Mostre as 4 metricas principais, destaque tendencias recentes dos casos diarios e mensais, "
             "e use as noticias apenas como contexto complementar. Nao invente dados. "
             "Se houver ausencia de noticias relevantes, diga isso explicitamente."

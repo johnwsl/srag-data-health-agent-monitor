@@ -123,7 +123,7 @@ with ui.sidebar(title="Filtros", width=280):
         choices=STATE_CHOICES,
         selected="SP",
     )
-    ui.input_action_button("gerar_relatorio", "Gerar relatório", class_="btn-primary")
+    ui.input_action_button("gerar_relatorio", "Gerar Relatório por IA", class_="btn-primary")
 
 
 pipeline_phase = reactive.Value("checking")
@@ -509,7 +509,7 @@ with ui.div(class_="srag-main"):
             task_status = generate_report_task.status()
             if task_status == "initial":
                 return ui.p(
-                    "Clique em 'Gerar relatório' para produzir um resumo executivo do estado selecionado.",
+                    "Clique em 'Gerar Relatório por IA' para produzir um resumo executivo do estado selecionado.",
                     class_="srag-page-subtitle",
                 )
 

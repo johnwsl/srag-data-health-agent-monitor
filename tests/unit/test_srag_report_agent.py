@@ -68,8 +68,8 @@ def test_generate_executive_summary_orchestrates_tools_and_llm():
     assert "Noticias" in llm_service.calls[0]["system_prompt"]
 
 
-def test_generate_executive_summary_limits_output_to_1500_chars():
-    long_text = "A" * 1800
+def test_generate_executive_summary_limits_output_to_4000_chars():
+    long_text = "A" * 4500
     agent = SragReportAgent(
         llm_service=FakeLLMService(long_text),
         metrics_service=FakeMetricsService("{}"),
@@ -78,5 +78,5 @@ def test_generate_executive_summary_limits_output_to_1500_chars():
 
     response = agent.generate_executive_summary("BRASIL")
 
-    assert len(response) <= 1500
+    assert len(response) <= 4000
     assert response.endswith("...")

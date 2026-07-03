@@ -17,7 +17,7 @@ O sistema entrega quatro blocos principais:
 
 ## O que o sistema faz
 
-1. **Download** — Baixa arquivos CSV de SRAG a partir de URLs configuradas e salva em `raw_data/`. Arquivos já presentes são reutilizados, sem novo download.
+1. **Download** — Baixa três arquivos CSV de SRAG (2019, 2025 e 2026) a partir de URLs configuradas no `.env` e salva em `raw_data/`. Arquivos já presentes são reutilizados, sem novo download.
 2. **ETL** — Faz merge dos CSVs, seleciona colunas relevantes, filtra registros inválidos, trata valores ausentes e deriva variáveis de período (`ANO_NOTIFIC`, `MES_NOTIFIC`).
 3. **Persistência** — Grava o dataset tratado no DuckDB (`data/srag.duckdb`), na tabela `srag_notificacoes`.
 4. **Pipeline** — Orquestra download + ETL em uma única chamada.
@@ -89,7 +89,7 @@ O agente usa a própria API do projeto como fonte oficial. Ao receber uma UF:
 3. consulta métricas e séries temporais
 4. busca notícias recentes via Tavily Search
 5. envia o contexto consolidado para a OpenAI via LangChain
-6. retorna um resumo executivo com até 1500 caracteres
+6. retorna um resumo executivo com até 4000 caracteres
 
 Mais detalhes em [`docs/agente_orquestrador.md`](docs/agente_orquestrador.md).
 
@@ -105,7 +105,9 @@ Mais detalhes em [`docs/agente_orquestrador.md`](docs/agente_orquestrador.md).
 cp .env.example .env
 ```
 
-Ajuste o `.env` se necessário. Os valores padrão já funcionam para desenvolvimento local.
+Ajuste o `.env` se necessário. Os valores padrão já funcionam para desenvolvimento local. Para o agente de IA, configure `OPENAI_API_KEY` e `TAVILY_API_KEY`.
+
+> **Docker:** após alterar o `.env`, recrie os containers com `docker compose up -d --force-recreate`. O comando `docker compose restart` não recarrega variáveis de ambiente.
 
 ### 2. Subir a aplicação
 
@@ -142,7 +144,7 @@ Esse é o endereço principal de uso do frontend. O dashboard permite:
 - selecionar uma UF ou `BRASIL`
 - visualizar as quatro métricas principais
 - acompanhar gráficos de casos diários e mensais
-- gerar um relatório executivo por IA no próprio frontend
+- gerar um relatório executivo por IA no próprio frontend (botão **Gerar Relatório por IA**)
 
 ### 6. Consultar métricas via API
 

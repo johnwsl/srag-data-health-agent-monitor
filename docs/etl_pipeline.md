@@ -451,7 +451,7 @@ curl http://localhost:8000/metrics/RJ
 
 ### Dashboard
 
-Com a API em execução, o dashboard Shiny está disponível em **[http://localhost:8080](http://localhost:8080)** (serviço `dashboard` no Docker ou `shiny run shiny_app/dashboard.py` localmente).
+Com a API em execução, o dashboard Shiny está disponível em **[http://localhost:8080](http://localhost:8080)** (serviço `dashboard` no Docker ou `shiny run shiny_app/dashboard.py` localmente). No dashboard é possível selecionar UF ou `BRASIL`, visualizar métricas e gráficos e gerar o relatório executivo pelo botão **Gerar Relatório por IA**.
 
 ---
 
@@ -496,7 +496,7 @@ srag-data-health-agent-monitor/
 Com os dados no DuckDB e as métricas expostas pela API, a aplicação oferece:
 
 - **Dashboard Shiny** em [http://localhost:8080](http://localhost:8080) para visualização interativa
-- **Agente de IA** via `POST /agents/report` para resumos executivos (ver [`agente_orquestrador.md`](agente_orquestrador.md))
+- **Agente de IA** via `POST /agents/report` para resumos executivos de até 4000 caracteres (ver [`agente_orquestrador.md`](agente_orquestrador.md))
 - **Séries temporais** para gráficos de casos diários e mensais
 
 O pipeline e as métricas formam a **base de dados e indicadores** sobre os quais o dashboard e o agente operam.

@@ -54,7 +54,7 @@ o agente executa a seguinte sequência:
    - `GET /metrics/{estado}/casos-mensais`
 4. invoca a tool `buscar_noticias_srag` com Tavily Search
 5. envia o contexto consolidado (status, dados oficiais e notícias) para a OpenAI
-6. retorna um resumo executivo com até **1500 caracteres**
+6. retorna um resumo executivo com até **4000 caracteres**
 
 ---
 
@@ -146,7 +146,7 @@ O prompt do agente instrui a LLM a produzir:
 - tendências dos casos diários e mensais
 - bloco **Notícias**
 - linguagem objetiva
-- limite de **1500 caracteres**
+- limite de **4000 caracteres**
 
 As notícias são usadas apenas como **contexto complementar** e devem permanecer separadas dos dados oficiais.
 
@@ -173,7 +173,7 @@ Se não houver notícias relevantes, o agente deve informar isso explicitamente.
 
 ### Resposta
 
-- o texto final é truncado para no máximo 1500 caracteres, se necessário (corte em limite de palavra)
+- o texto final é truncado para no máximo 4000 caracteres, se necessário (corte em limite de palavra)
 - o agente deve deixar clara a separação entre fatos medidos e contexto noticioso
 - falhas na geração retornam HTTP **502**
 
@@ -221,7 +221,7 @@ O agente depende destas variáveis (definidas no `.env`):
 | `HTTP_TIMEOUT_SECONDS` | Timeout das chamadas HTTP | `300` |
 | `LOG_LEVEL` | Nível de logging | `INFO` |
 
-No Docker, o serviço `dashboard` usa `API_BASE_URL=http://api:8000` para comunicação interna entre containers.
+No Docker, o serviço `dashboard` usa `API_BASE_URL=http://api:8000` para comunicação interna entre containers. Após alterar o `.env`, recrie os containers com `docker compose up -d --force-recreate` para que as novas variáveis sejam carregadas.
 
 ---
 
@@ -233,7 +233,7 @@ O dashboard em **[http://localhost:8080](http://localhost:8080)** (`shiny_app/da
 - verificação automática do status do pipeline
 - cards com as quatro métricas principais
 - gráficos de casos diários e mensais (Plotly)
-- botão **Gerar relatório**
+- botão **Gerar Relatório por IA**
 - card textual para exibir o resumo do agente
 
 Assim, o frontend apresenta métricas, gráficos e análise executiva em uma única interface.
@@ -246,7 +246,7 @@ Os testes do agente e dos serviços relacionados estão em:
 
 | Arquivo | Cobertura |
 |---------|-----------|
-| `tests/unit/test_srag_report_agent.py` | Orquestração do agente e limite de 1500 caracteres |
+| `tests/unit/test_srag_report_agent.py` | Orquestração do agente e limite de 4000 caracteres |
 | `tests/unit/test_agent_routes.py` | Endpoint `/agents/report` (sucesso, 422, 502) |
 | `tests/unit/test_srag_metrics_api_service.py` | Cliente HTTP, tool LangChain e `ensure_pipeline_ready` |
 | `tests/unit/test_openai_langchain_service.py` | Integração com OpenAI via LangChain |
