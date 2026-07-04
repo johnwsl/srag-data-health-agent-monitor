@@ -70,9 +70,9 @@ flowchart TD
     F -- não --> G[POST /datasets/pipeline]
     F -- sim --> H[Tool consultar_metricas_srag]
     G --> H
-    H --> I[GET /metrics/{estado}]
-    H --> J[GET /metrics/{estado}/casos-diarios]
-    H --> K[GET /metrics/{estado}/casos-mensais]
+    H --> I[GET /metrics/estado]
+    H --> J[GET /metrics/estado/casos-diarios]
+    H --> K[GET /metrics/estado/casos-mensais]
     C --> L[Tool buscar_noticias_srag]
     L --> M[Tavily Search]
     I --> N[OpenAI via LangChain]

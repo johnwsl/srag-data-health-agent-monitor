@@ -31,7 +31,7 @@ flowchart LR
     Orchestrator -->|executa se necessário| PipelineRun[POST /datasets/pipeline]
 
     Orchestrator --> MetricsTool[Tool LangChain<br/>consultar_metricas_srag]
-    MetricsTool --> MetricsAPI[API SRAG<br/>/metrics/{estado}<br/>/casos-diarios<br/>/casos-mensais]
+    MetricsTool --> MetricsAPI[API SRAG<br/>/metrics/estado<br/>/casos-diarios<br/>/casos-mensais]
     MetricsAPI --> DuckDB
 
     Orchestrator --> NewsTool[Tool LangChain<br/>buscar_noticias_srag]
@@ -162,9 +162,9 @@ sequenceDiagram
     MT->>A: GET /datasets/status
     MT->>A: POST /datasets/pipeline se necessário
     O->>MT: consultar_metricas_srag(estado)
-    MT->>A: GET /metrics/{estado}
-    MT->>A: GET /metrics/{estado}/casos-diarios
-    MT->>A: GET /metrics/{estado}/casos-mensais
+    MT->>A: GET /metrics/estado
+    MT->>A: GET /metrics/estado/casos-diarios
+    MT->>A: GET /metrics/estado/casos-mensais
     A->>DB: Consulta dados analíticos
     DB-->>A: Métricas e séries
     A-->>MT: JSON consolidado
