@@ -253,6 +253,7 @@ Informações mais detalhadas estão na pasta [`docs/`](docs/):
 
 | Documento | Conteúdo |
 |-----------|----------|
+| [`docs/arquitetura_solucao_srag.md`](docs/arquitetura_solucao_srag.md) | Diagrama conceitual da arquitetura da solução, incluindo frontend, backend, agente orquestrador, tools, LLM, banco de dados e fontes de notícias |
 | [`docs/etl_pipeline.md`](docs/etl_pipeline.md) | Pipeline completo: download, ETL, arquitetura, configuração e exemplos |
 | [`docs/metricas_srag.md`](docs/metricas_srag.md) | Cálculo das métricas SRAG, escopo por UF/Brasil, endpoint da API, fórmulas e cenários |
 | [`docs/agente_orquestrador.md`](docs/agente_orquestrador.md) | Arquitetura do agente, tools LangChain, guardrails, fluxo do relatório e endpoint `/agents/report` |

@@ -53,7 +53,7 @@ Ele permite selecionar uma UF ou `BRASIL`, visualizar cards de métricas, acompa
 
 ### Backend
 
-O backend é uma API **FastAPI**, disponível em `http://localhost:8000`.
+O backend é uma API **FastAPI**. Documentação da API disponível em: `http://localhost:8000/docs`.
 
 Ele expõe endpoints para saúde da aplicação, download dos datasets, execução da pipeline, consulta de métricas e geração do relatório por IA.
 
