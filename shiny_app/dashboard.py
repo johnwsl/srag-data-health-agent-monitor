@@ -414,7 +414,7 @@ with ui.div(class_="srag-main"):
                 ui.div(
                     ui.span(f"Escopo: {data['sg_uf_not']}", class_="srag-status-badge"),
                     ui.p(
-                        f"Período analisado: {_period_label(data)}",
+                        f"Período analisado (para o cálculo das métricas): {_period_label(data)}",
                         class_="srag-status-period",
                     ),
                     class_="srag-status-info",
