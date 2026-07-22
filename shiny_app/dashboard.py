@@ -113,6 +113,15 @@ ui.tags.style(
         color: #212529;
         margin-bottom: 0;
     }
+    .srag-report-charts {
+        margin-top: 1rem;
+    }
+    .srag-report-caveat {
+        color: #6c757d;
+        font-size: 0.85rem;
+        margin-top: 0.5rem;
+        margin-bottom: 0;
+    }
     """
 )
 
@@ -361,6 +370,67 @@ def _empty_figure(message: str) -> go.Figure:
     return fig
 
 
+def _find_report_chart(chart_id: str) -> dict | None:
+    if generate_report_task.status() != "success":
+        return None
+    result = generate_report_task.result()
+    if not result.get("ok"):
+        return None
+    charts = result.get("data", {}).get("charts") or []
+    for chart in charts:
+        if chart.get("id") == chart_id:
+            return chart
+    return None
+
+
+def _figure_from_chart_spec(chart: dict | None, empty_message: str) -> go.Figure:
+    if not chart:
+        return _empty_figure(empty_message)
+
+    data = chart.get("data") or []
+    x_field = chart.get("x", {}).get("field", "x")
+    y_field = chart.get("y", {}).get("field", "y")
+    x_label = chart.get("x", {}).get("label", "")
+    y_label = chart.get("y", {}).get("label", "")
+    xs = [point.get(x_field) for point in data]
+    ys = [point.get(y_field) for point in data]
+
+    if chart.get("type") == "bar":
+        fig = go.Figure(
+            data=[
+                go.Bar(
+                    x=xs,
+                    y=ys,
+                    marker_color="#198754",
+                    name=y_label or "Casos",
+                )
+            ]
+        )
+    else:
+        fig = go.Figure(
+            data=[
+                go.Scatter(
+                    x=xs,
+                    y=ys,
+                    mode="lines+markers",
+                    line=dict(color="#0d6efd", width=2),
+                    marker=dict(size=5),
+                    name=y_label or "Casos",
+                )
+            ]
+        )
+
+    fig.update_layout(
+        title=dict(text=chart.get("title") or "", font=dict(size=14)),
+        height=320,
+        margin=dict(t=40, r=20, l=20, b=20),
+        xaxis_title=x_label,
+        yaxis_title=y_label,
+        showlegend=False,
+    )
+    return fig
+
+
 with ui.div():
     @render.ui
     def pipeline_overlay():
@@ -524,10 +594,18 @@ with ui.div(class_="srag-main"):
                 result = generate_report_task.result()
                 if not result["ok"]:
                     return ui.p(result["error"], class_="srag-error")
-                return ui.div(
-                    ui.markdown(result["data"]["resumo_executivo"]),
-                    class_="srag-report-text",
-                )
+
+                charts = result["data"].get("charts") or []
+                caveat = next((chart.get("caveat") for chart in charts if chart.get("caveat")), None)
+                children = [
+                    ui.div(
+                        ui.markdown(result["data"]["resumo_executivo"]),
+                        class_="srag-report-text",
+                    )
+                ]
+                if caveat:
+                    children.append(ui.p(caveat, class_="srag-report-caveat"))
+                return ui.div(*children)
 
             if task_status == "error":
                 try:
@@ -536,3 +614,25 @@ with ui.div(class_="srag-main"):
                     return ui.p(str(error), class_="srag-error")
 
             return ui.p("Não foi possível gerar o relatório.", class_="srag-error")
+
+        with ui.div(class_="srag-report-charts"):
+            with ui.layout_columns(col_widths=(6, 6)):
+                with ui.card(full_screen=True):
+                    ui.card_header("Gráfico do relatório — casos diários")
+
+                    @render_plotly
+                    def report_chart_casos_diarios():
+                        return _figure_from_chart_spec(
+                            _find_report_chart("casos_diarios"),
+                            "Gere o relatório para visualizar o gráfico diário.",
+                        )
+
+                with ui.card(full_screen=True):
+                    ui.card_header("Gráfico do relatório — casos mensais")
+
+                    @render_plotly
+                    def report_chart_casos_mensais():
+                        return _figure_from_chart_spec(
+                            _find_report_chart("casos_mensais"),
+                            "Gere o relatório para visualizar o gráfico mensal.",
+                        )

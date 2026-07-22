@@ -1,3 +1,7 @@
+import json
+from typing import Any
+
+from app.services.chart_spec_service import ChartSpecService
 from app.services.openai_langchain_service import OpenAILangChainService
 from app.services.srag_metrics_api_service import SragMetricsApiLangChainService
 from app.services.tavily_news_service import TavilyNewsLangChainService
@@ -11,27 +15,34 @@ class SragReportAgent:
         llm_service: OpenAILangChainService | None = None,
         metrics_service: SragMetricsApiLangChainService | None = None,
         news_service: TavilyNewsLangChainService | None = None,
+        chart_spec_service: ChartSpecService | None = None,
         max_chars: int = 4000,
     ) -> None:
         self.llm_service = llm_service or OpenAILangChainService()
         self.metrics_service = metrics_service or SragMetricsApiLangChainService()
         self.news_service = news_service or TavilyNewsLangChainService()
+        self.chart_spec_service = chart_spec_service or ChartSpecService()
         self.max_chars = max_chars
 
-    def generate_executive_summary(self, estado: str) -> str:
+    def generate_executive_summary(self, estado: str) -> dict[str, Any]:
         pipeline_status = self.metrics_service.ensure_pipeline_ready()
-        metrics_tool = self.metrics_service.as_tool()
-        news_tool = self.news_service.as_tool()
-
-        official_data = metrics_tool.invoke({"estado": estado})
-        news_data = news_tool.invoke({})
+        official_payload = self.metrics_service.get_full_metrics_data(estado)
+        official_data = json.dumps(official_payload, ensure_ascii=False, default=str)
+        news_data = self.news_service.as_tool().invoke({})
+        charts = self.chart_spec_service.from_metrics_payload(official_payload)
 
         system_prompt = (
             "Voce e um analista de saude publica. Produza um resumo executivo em portugues, "
-            "com no maximo 4000 caracteres, separando claramente 'Dados oficiais' e 'Noticias'. "
+            "com no maximo 5000 caracteres, separando claramente 'Dados oficiais' e 'Noticias'. "
             "Mostre as 4 metricas principais, destaque tendencias recentes dos casos diarios e mensais, "
             "e use as noticias apenas como contexto complementar. Nao invente dados. "
-            "Se houver ausencia de noticias relevantes, diga isso explicitamente."
+            "Se houver ausencia de noticias relevantes, diga isso explicitamente. "
+            "Importante sobre vies temporal: os dados recentes de SRAG sofrem atraso de "
+            "digitacao/notificacao. Nao interprete queda abrupta nos dias ou semanas mais recentes "
+            "como reducao real de casos sem mencionar a possibilidade de incompleteness dos dados. "
+            "Prefira analisar tendencias em periodos mais consolidados quando houver sinais de "
+            "defasagem. O relatorio e acompanhado por graficos oficiais das series diaria e mensal; "
+            "voce pode referenciar esses graficos no texto."
         )
 
         user_prompt = (
@@ -44,13 +55,18 @@ class SragReportAgent:
             f"{news_data}\n\n"
             "Escreva um resumo executivo curto com:\n"
             "1. panorama geral;\n"
-            "2. bloco 'Dados oficiais' com as 4 metricas e tendencias;\n"
+            "2. bloco 'Dados oficiais' com as 4 metricas e tendencias "
+            "(incluindo referencia aos graficos diario e mensal quando fizer sentido);\n"
             "3. bloco 'Noticias' separado dos dados oficiais;\n"
-            "4. linguagem objetiva."
+            "4. linguagem objetiva;\n"
+            "5. alerta breve se a serie recente parecer incompleta por atraso de notificacao."
         )
 
         response = self.llm_service.ask(user_prompt, system_prompt=system_prompt)
-        return self._limit_text(response)
+        return {
+            "resumo_executivo": self._limit_text(response),
+            "charts": charts,
+        }
 
     def _limit_text(self, text: str) -> str:
         compact = text.strip()

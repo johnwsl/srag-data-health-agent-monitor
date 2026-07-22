@@ -22,6 +22,7 @@ O fluxo segue o padrão MVC já adotado no projeto:
 | Controller | `app/controllers/agent_controller.py` | Valida entrada e trata erros HTTP |
 | Agente | `app/services/srag_report_agent.py` | Orquestra pipeline, tools e chamada à LLM |
 | Modelos | `app/models/agent.py` | `ExecutiveSummaryRequest` e `ExecutiveSummaryResponse` |
+| ChartSpec | `app/models/chart.py` + `app/services/chart_spec_service.py` | Contrato e montagem dos gráficos oficiais do relatório |
 
 ### Services envolvidos
 
@@ -194,10 +195,33 @@ curl -X POST http://localhost:8000/agents/report \
 ```json
 {
   "estado": "SP",
-  "resumo_executivo": "Resumo executivo em português..."
+  "resumo_executivo": "Resumo executivo em português...",
+  "charts": [
+    {
+      "id": "casos_diarios",
+      "type": "line",
+      "title": "Casos diários de SRAG — SP",
+      "x": {"field": "data", "label": "Data"},
+      "y": {"field": "casos", "label": "Notificações"},
+      "data": [{"data": "2026-06-01", "casos": 12}],
+      "source": "GET /metrics/SP/casos-diarios",
+      "caveat": "Períodos recentes podem estar incompletos por atraso de digitação/notificação; ..."
+    },
+    {
+      "id": "casos_mensais",
+      "type": "bar",
+      "title": "Casos mensais de SRAG — SP",
+      "x": {"field": "label", "label": "Mês"},
+      "y": {"field": "casos", "label": "Notificações"},
+      "data": [{"label": "05/2026", "casos": 100}],
+      "source": "GET /metrics/SP/casos-mensais",
+      "caveat": "Períodos recentes podem estar incompletos por atraso de digitação/notificação; ..."
+    }
+  ]
 }
 ```
 
+Os gráficos (`ChartSpec`) são montados por `ChartSpecService` a partir das séries oficiais da API. O prompt do agente orienta a não interpretar queda recente como redução real sem considerar atraso de notificação.
 ### Códigos de erro
 
 | Código | Situação |
@@ -235,6 +259,7 @@ O dashboard em **[http://localhost:8080](http://localhost:8080)** (`shiny_app/da
 - gráficos de casos diários e mensais (Plotly)
 - botão **Gerar Relatório por IA**
 - card textual para exibir o resumo do agente
+- gráficos do relatório (diário e mensal) renderizados via Plotly a partir de `charts`
 
 Assim, o frontend apresenta métricas, gráficos e análise executiva em uma única interface.
 
@@ -246,8 +271,9 @@ Os testes do agente e dos serviços relacionados estão em:
 
 | Arquivo | Cobertura |
 |---------|-----------|
-| `tests/unit/test_srag_report_agent.py` | Orquestração do agente e limite de 4000 caracteres |
+| `tests/unit/test_srag_report_agent.py` | Orquestração do agente, charts e limite de 4000 caracteres |
 | `tests/unit/test_agent_routes.py` | Endpoint `/agents/report` (sucesso, 422, 502) |
+| `tests/unit/test_chart_spec_service.py` | Montagem de ChartSpec a partir das séries oficiais |
 | `tests/unit/test_srag_metrics_api_service.py` | Cliente HTTP, tool LangChain e `ensure_pipeline_ready` |
 | `tests/unit/test_openai_langchain_service.py` | Integração com OpenAI via LangChain |
 | `tests/unit/test_tavily_news_service.py` | Busca de notícias, filtros e tool LangChain |

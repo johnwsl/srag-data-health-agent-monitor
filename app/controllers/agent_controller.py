@@ -17,7 +17,7 @@ class AgentController:
         estado = payload.estado.strip().upper()
 
         try:
-            summary = self._get_report_agent().generate_executive_summary(estado)
+            result = self._get_report_agent().generate_executive_summary(estado)
         except ValueError as error:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
@@ -29,4 +29,8 @@ class AgentController:
                 detail=f"Falha ao gerar resumo executivo: {error}",
             ) from error
 
-        return ExecutiveSummaryResponse(estado=estado, resumo_executivo=summary)
+        return ExecutiveSummaryResponse(
+            estado=estado,
+            resumo_executivo=result["resumo_executivo"],
+            charts=result.get("charts") or [],
+        )

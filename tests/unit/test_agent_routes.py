@@ -5,6 +5,7 @@ from fastapi.testclient import TestClient
 
 from app.controllers.agent_controller import AgentController
 from app.main import app
+from app.models.chart import ChartAxisSpec, ChartSpec
 from app.services.srag_report_agent import SragReportAgent
 from app.views import agent_routes
 
@@ -12,10 +13,24 @@ from app.views import agent_routes
 @pytest.fixture
 def mock_report_agent() -> MagicMock:
     agent = MagicMock(spec=SragReportAgent)
-    agent.generate_executive_summary.return_value = (
-        "Panorama geral.\nDados oficiais: taxa de aumento, mortalidade, UTI e vacinacao.\n"
-        "Noticias: sem eventos criticos recentes."
-    )
+    agent.generate_executive_summary.return_value = {
+        "resumo_executivo": (
+            "Panorama geral.\nDados oficiais: taxa de aumento, mortalidade, UTI e vacinacao.\n"
+            "Noticias: sem eventos criticos recentes."
+        ),
+        "charts": [
+            ChartSpec(
+                id="casos_diarios",
+                type="line",
+                title="Casos diários de SRAG — SP",
+                x=ChartAxisSpec(field="data", label="Data"),
+                y=ChartAxisSpec(field="casos", label="Notificações"),
+                data=[{"data": "2026-06-01", "casos": 2}],
+                source="GET /metrics/SP/casos-diarios",
+                caveat="Períodos recentes podem estar incompletos.",
+            )
+        ],
+    }
     return agent
 
 
@@ -34,6 +49,8 @@ def test_generate_report_returns_summary(client, mock_report_agent):
     payload = response.json()
     assert payload["estado"] == "SP"
     assert "Dados oficiais" in payload["resumo_executivo"]
+    assert len(payload["charts"]) == 1
+    assert payload["charts"][0]["id"] == "casos_diarios"
     mock_report_agent.generate_executive_summary.assert_called_once_with("SP")
 
 
