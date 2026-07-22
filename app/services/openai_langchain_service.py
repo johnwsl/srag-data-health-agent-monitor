@@ -1,9 +1,10 @@
 import os
 from collections.abc import Sequence
+from typing import Any
 
 
 class OpenAILangChainService:
-    """Encapsula interacoes simples com um chat model da OpenAI via LangChain."""
+    """Encapsula interacoes com um chat model da OpenAI via LangChain."""
 
     def __init__(
         self,
@@ -21,6 +22,10 @@ class OpenAILangChainService:
             raise ValueError("OPENAI_API_KEY nao configurada.")
 
         self._client = self._build_client()
+
+    def get_model(self):
+        """Retorna o chat model LangChain (ex.: para LangGraph)."""
+        return self._client
 
     def _build_client(self):
         try:
@@ -51,6 +56,72 @@ class OpenAILangChainService:
         """Envia uma lista de mensagens no formato (role, content)."""
         response = self._client.invoke(list(messages))
         return self._extract_text(response)
+
+    def run_with_tools(
+        self,
+        *,
+        system_prompt: str,
+        user_prompt: str,
+        tools: Sequence[Any],
+        max_iterations: int = 8,
+    ) -> str:
+        """Executa um loop de tool calling ate a LLM responder sem novas tools."""
+        try:
+            from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
+        except ImportError as exc:
+            raise ImportError(
+                "Dependencia ausente. Instale 'langchain-core' para usar run_with_tools()."
+            ) from exc
+
+        if not tools:
+            return self.ask(user_prompt, system_prompt=system_prompt)
+
+        llm_with_tools = self._client.bind_tools(list(tools))
+        tool_map = {tool.name: tool for tool in tools}
+        messages: list[Any] = [
+            SystemMessage(content=system_prompt),
+            HumanMessage(content=user_prompt),
+        ]
+
+        for _ in range(max_iterations):
+            ai_message = llm_with_tools.invoke(messages)
+            messages.append(ai_message)
+
+            tool_calls = getattr(ai_message, "tool_calls", None) or []
+            if not tool_calls:
+                return self._extract_text(ai_message)
+
+            if not isinstance(ai_message, AIMessage):
+                messages[-1] = AIMessage(
+                    content=getattr(ai_message, "content", ""),
+                    tool_calls=tool_calls,
+                )
+
+            for tool_call in tool_calls:
+                name = tool_call.get("name") if isinstance(tool_call, dict) else getattr(tool_call, "name", None)
+                args = tool_call.get("args") if isinstance(tool_call, dict) else getattr(tool_call, "args", {})
+                call_id = tool_call.get("id") if isinstance(tool_call, dict) else getattr(tool_call, "id", name)
+
+                tool = tool_map.get(name)
+                if tool is None:
+                    result = f"Tool desconhecida: {name}"
+                else:
+                    try:
+                        result = tool.invoke(args or {})
+                    except Exception as error:  # noqa: BLE001
+                        result = f"Erro ao executar {name}: {error}"
+
+                messages.append(
+                    ToolMessage(
+                        content=result if isinstance(result, str) else str(result),
+                        tool_call_id=str(call_id),
+                    )
+                )
+
+        return (
+            "Nao foi possivel concluir o raciocinio com as ferramentas no limite de iteracoes. "
+            "Tente novamente."
+        )
 
     @staticmethod
     def _extract_text(response) -> str:

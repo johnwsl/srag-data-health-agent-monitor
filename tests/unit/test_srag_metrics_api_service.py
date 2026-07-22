@@ -151,6 +151,19 @@ def test_as_tool_invokes_service(metrics_api_service):
     assert len(payload["metricas"]) == 4
 
 
+def test_as_series_tool_returns_daily_and_monthly(metrics_api_service):
+    tool = metrics_api_service.as_series_tool()
+
+    assert tool.name == "consultar_serie_temporal"
+    daily = json.loads(tool.invoke({"estado": "SP", "serie": "diaria"}))
+    monthly = json.loads(tool.invoke({"estado": "sp", "serie": "mensal"}))
+
+    assert daily["serie"] == "diaria"
+    assert daily["pontos"][0]["total_casos"] == 1
+    assert monthly["serie"] == "mensal"
+    assert monthly["pontos"][0]["total_casos"] == 10
+
+
 def test_ensure_pipeline_ready_returns_existing_status(metrics_api_service):
     payload = metrics_api_service.ensure_pipeline_ready()
 
