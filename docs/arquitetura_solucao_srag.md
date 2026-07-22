@@ -49,7 +49,7 @@ flowchart LR
 
 O frontend é o dashboard em **Shiny for Python**, disponível em `http://localhost:8080`.
 
-Ele permite selecionar uma UF ou `BRASIL`, visualizar cards de métricas, acompanhar gráficos de casos diários e mensais com Plotly e solicitar o relatório executivo por IA pelo botão **Gerar Relatório por IA**.
+Ele permite selecionar uma UF ou `BRASIL`, visualizar cards de métricas, solicitar o relatório executivo por IA e conversar com o chatbot (gráficos oficiais via ChartSpec no relatório/chat).
 
 ### Backend
 

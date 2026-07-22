@@ -10,7 +10,7 @@ def build_srag_agent_tools(
     news_service: TavilyNewsLangChainService,
     chart_spec_service: ChartSpecService,
 ) -> list[Any]:
-    """Tools compartilhadas pelo agente de relatório e pelo chatbot LangGraph."""
+    """Tools do orquestrador unico LangGraph (metricas, series, graficos e Tavily)."""
     return [
         metrics_service.as_tool(),
         metrics_service.as_series_tool(),
