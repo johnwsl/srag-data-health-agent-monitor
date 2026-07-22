@@ -155,7 +155,7 @@ Obter os arquivos CSV de SRAG a partir das URLs configuradas no [Portal de Dados
 
 ### Datasets configurados
 
-Por padrão, o sistema baixa **três arquivos**, definidos no `.env`:
+Por padrão, o sistema baixa **quatro arquivos**, definidos no `.env`:
 
 | Variável | Exemplo |
 |----------|---------|
@@ -165,6 +165,8 @@ Por padrão, o sistema baixa **três arquivos**, definidos no `.env`:
 | `DATASET_URL_2025` | URL do CSV de 2025 no portal SUS |
 | `DATASET_NAME_2026` | `INFLUD26-29-06-2026.csv` |
 | `DATASET_URL_2026` | URL do CSV de 2026 no portal SUS |
+| `DATASET_NAME_2026_2` | `INFLUD26-20-07-2026.csv` |
+| `DATASET_URL_2026_2` | URL do CSV atualizado de 2026 no portal SUS |
 
 ### Como funciona
 
@@ -192,8 +194,8 @@ Por padrão, o sistema baixa **três arquivos**, definidos no `.env`:
 ```json
 {
   "message": "Download concluído; alguns datasets já estavam presentes.",
-  "total": 3,
-  "successful": 3,
+  "total": 4,
+  "successful": 4,
   "failed": 0,
   "datasets": [
     {
@@ -309,11 +311,12 @@ UTI, VACINA_COV, VACINA, ANO_NOTIFIC, MES_NOTIFIC
   "files_merged": [
     "INFLUD19-23-03-2026.csv",
     "INFLUD25-29-06-2026.csv",
+    "INFLUD26-20-07-2026.csv",
     "INFLUD26-29-06-2026.csv"
   ],
-  "rows_before_filter": 385213,
-  "rows_after_filter": 385167,
-  "rows_saved": 385167,
+  "rows_before_filter": 702364,
+  "rows_after_filter": 702314,
+  "rows_saved": 702314,
   "table_name": "srag_notificacoes",
   "database_path": "./data/srag.duckdb"
 }
@@ -483,7 +486,8 @@ srag-data-health-agent-monitor/
 ├── raw_data/
 │   ├── INFLUD19-23-03-2026.csv    ← download
 │   ├── INFLUD25-29-06-2026.csv    ← download
-│   └── INFLUD26-29-06-2026.csv    ← download
+│   ├── INFLUD26-29-06-2026.csv    ← download
+│   └── INFLUD26-20-07-2026.csv    ← download (atualização 2026)
 └── data/
     └── srag.duckdb                ← ETL (tabela srag_notificacoes)
                                    ← consultado por GET /metrics/{estado}
