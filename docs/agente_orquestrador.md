@@ -130,7 +130,7 @@ Configuração da busca Tavily:
 |-----------|-------|
 | `topic` | `news` |
 | `search_depth` | `advanced` |
-| `time_range` | `month` |
+| `time_range` | `year` |
 | `max_results` | `5` |
 | `include_domains` | `gov.br`, `saude.gov.br`, `g1.globo.com`, `uol.com.br`, `cnnbrasil.com.br` |
 

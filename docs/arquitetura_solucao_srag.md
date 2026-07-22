@@ -121,7 +121,7 @@ Tool estruturada do LangChain definida por `TavilyNewsLangChainService`.
 Responsabilidades:
 
 - buscar notícias recentes sobre SRAG no Brasil via **Tavily Search**;
-- limitar a busca a notícias recentes, com `topic=news`, `search_depth=advanced`, `time_range=month` e `max_results=5`;
+- limitar a busca a notícias recentes, com `topic=news`, `search_depth=advanced`, `time_range=year` e `max_results=5`;
 - priorizar fontes como `gov.br`, `saude.gov.br`, `g1.globo.com`, `uol.com.br` e `cnnbrasil.com.br`;
 - aplicar guardrails para evitar conteúdos fora do tema, fora do Brasil ou inadequados;
 - retornar manchetes, resumos e URLs relevantes.
