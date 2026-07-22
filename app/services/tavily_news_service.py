@@ -63,7 +63,7 @@ class TavilyNewsLangChainService:
             include_answer=False,
             include_raw_content=False,
             search_depth="advanced",
-            time_range="month",
+            time_range="year",
             include_domains=["gov.br", "saude.gov.br", "g1.globo.com", "uol.com.br", "cnnbrasil.com.br"],
         )
 
