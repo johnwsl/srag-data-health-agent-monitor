@@ -34,12 +34,16 @@ class LangGraphOrchestratorAgent:
         "Nas respostas do chat que usem metricas oficiais, informe explicitamente o escopo "
         "(UF ou BRASIL) e o periodo analisado para o cálculo das metricas (ex.: 05/2026 -> 06/2026), usando os campos "
         "mes_anterior_* e mes_atual_* retornados pelas tools — nao invente o periodo. "
-        "Se o usuario pedir relatorio, resumo executivo ou painel completo, chame "
-        "gerar_relatorio_executivo com o estado correto. "
+        "Chame gerar_relatorio_executivo SOMENTE quando o usuario pedir de forma EXPLICITA e DIRETA "
+        "um relatorio/resumo executivo/painel completo (ex.: 'gere o relatorio do Brasil', "
+        "'resumo executivo de SP'). "
+        "NAO chame gerar_relatorio_executivo para perguntas pontuais sobre metricas, taxas, "
+        "tendencias, series ou noticias — mesmo que ja exista um relatorio na conversa. "
+        "Nesses casos use apenas consultar_metricas_srag, consultar_serie_temporal, "
+        "gerar_especificacao_grafico e/ou buscar_noticias_srag. "
         "IMPORTANTE: NUNCA cole o texto completo do relatorio na resposta do chat. "
         "No chat, apenas confirme de forma breve que o relatorio foi gerado e sera exibido "
         "na secao 'Relatorio gerado por IA', mencionando escopo e periodo quando disponiveis. "
-        "Para perguntas pontuais (sem pedido de relatorio), responda no chat com base nas tools. "
         "Importante sobre vies temporal: dados recentes sofrem atraso de digitacao/notificacao. "
         "Nao interprete queda abrupta no fim da serie como reducao real sem mencionar incompleteness. "
         "Se a pergunta estiver fora de SRAG/saude respiratoria no Brasil, recuse educadamente."
@@ -132,6 +136,8 @@ class LangGraphOrchestratorAgent:
             name="gerar_relatorio_executivo",
             description=(
                 "Gera o relatorio executivo completo de SRAG para uma UF ou BRASIL. "
+                "Use APENAS quando o usuario pedir explicitamente um relatorio/resumo executivo/"
+                "painel completo. Nao use para perguntas pontuais de metricas ou noticias. "
                 "O texto completo sera exibido na secao Relatorio gerado por IA do dashboard; "
                 "nao deve ser colado no chat."
             ),
@@ -180,9 +186,24 @@ class LangGraphOrchestratorAgent:
         return str(content)
 
     @staticmethod
+    def _messages_for_current_turn(messages: list[Any]) -> list[Any]:
+        """Retorna so as mensagens apos o ultimo turno humano (evita tools de historico)."""
+        last_human_idx = -1
+        for idx, message in enumerate(messages):
+            message_type = getattr(message, "type", None)
+            if message_type == "human":
+                last_human_idx = idx
+                continue
+            if isinstance(message, dict) and message.get("role") in {"user", "human"}:
+                last_human_idx = idx
+        if last_human_idx < 0:
+            return messages
+        return messages[last_human_idx + 1 :]
+
+    @staticmethod
     def _extract_tools_used(messages: list[Any]) -> list[str]:
         used: list[str] = []
-        for message in messages:
+        for message in LangGraphOrchestratorAgent._messages_for_current_turn(messages):
             tool_calls = getattr(message, "tool_calls", None) or []
             for tool_call in tool_calls:
                 if isinstance(tool_call, dict):

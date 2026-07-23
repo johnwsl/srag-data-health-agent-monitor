@@ -87,6 +87,47 @@ def test_chat_agent_invokes_langgraph_and_returns_charts():
     assert "Como esta a SRAG em SP?" in content
 
 
+def test_tools_used_only_counts_current_turn():
+    fake_graph = MagicMock()
+    fake_graph.invoke.return_value = {
+        "messages": [
+            SimpleNamespace(type="human", content="Gere o relatorio", tool_calls=[]),
+            SimpleNamespace(
+                type="ai",
+                content="",
+                tool_calls=[{"name": "gerar_relatorio_executivo", "args": {"estado": "BRASIL"}, "id": "1"}],
+            ),
+            SimpleNamespace(type="tool", content="ok", tool_calls=[]),
+            SimpleNamespace(type="ai", content="Relatorio pronto.", tool_calls=[]),
+            SimpleNamespace(type="human", content="Qual a mortalidade?", tool_calls=[]),
+            SimpleNamespace(
+                type="ai",
+                content="",
+                tool_calls=[{"name": "consultar_metricas_srag", "args": {"estado": "BRASIL"}, "id": "2"}],
+            ),
+            SimpleNamespace(type="tool", content="{}", tool_calls=[]),
+            SimpleNamespace(
+                type="ai",
+                content="A taxa de mortalidade e X.",
+                tool_calls=[],
+            ),
+        ]
+    }
+    orchestrator = LangGraphOrchestratorAgent(
+        llm_service=MagicMock(),
+        metrics_service=FakeMetricsService(),
+        news_service=MagicMock(),
+        chart_spec_service=ChartSpecService(),
+        graph=fake_graph,
+    )
+
+    result = orchestrator.chat("Qual a mortalidade?", session_id="sess-turn")
+
+    assert result["tools_used"] == ["consultar_metricas_srag"]
+    assert result["report"] is None
+    assert "mortalidade" in result["reply"].lower()
+
+
 def test_chat_agent_rejects_empty_message():
     agent = SragChatAgent(
         orchestrator=LangGraphOrchestratorAgent(

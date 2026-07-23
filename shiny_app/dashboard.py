@@ -139,6 +139,38 @@ ui.tags.style(
     """
 )
 
+ui.tags.script(
+    """
+    (() => {
+      const scrollChatToBottom = () => {
+        const log = document.getElementById("srag-chat-log");
+        if (!log) return;
+        log.scrollTop = log.scrollHeight;
+      };
+
+      const scheduleScroll = () => {
+        requestAnimationFrame(() => {
+          scrollChatToBottom();
+          // Segundo passe apos layout do Shiny/Plotly.
+          setTimeout(scrollChatToBottom, 50);
+        });
+      };
+
+      const observer = new MutationObserver(scheduleScroll);
+      const start = () => {
+        observer.observe(document.body, { childList: true, subtree: true });
+        scheduleScroll();
+      };
+
+      if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", start);
+      } else {
+        start();
+      }
+    })();
+    """
+)
+
 pipeline_phase = reactive.Value("checking")
 pipeline_error = reactive.Value("")
 report_data = reactive.Value(None)
@@ -331,12 +363,9 @@ def consume_chat_task_result() -> None:
         chat_session_id.set(data["session_id"])
 
     tools = data.get("tools_used") or []
-    if "gerar_relatorio_executivo" in tools and not data.get("report"):
-        report_generating.set(True)
-
+    # So atualiza a secao de relatorio quando um novo report veio nesta rodada.
     if data.get("report"):
         report_data.set(data["report"])
-        report_generating.set(False)
 
     history = list(chat_messages.get())
     history.append(
@@ -504,7 +533,7 @@ with ui.div(class_="srag-main"):
                     )
                 )
             else:
-                body.append(ui.div(*bubbles, class_="srag-chat-log"))
+                body.append(ui.div(*bubbles, class_="srag-chat-log", id="srag-chat-log"))
 
             if chat_error.get():
                 body.append(ui.p(chat_error.get(), class_="srag-error"))
@@ -535,7 +564,7 @@ with ui.div(class_="srag-main"):
                 )
 
             if report_generating.get():
-                return ui.div(
+                loading = ui.div(
                     ui.strong("Gerando relatório..."),
                     ui.p(
                         "A IA está consolidando dados oficiais e notícias recentes.",
@@ -543,6 +572,23 @@ with ui.div(class_="srag-main"):
                     ),
                     class_="srag-loading",
                 )
+                report = report_data.get()
+                if not report:
+                    return loading
+                # Mantem o relatorio anterior visivel enquanto um novo e gerado.
+                charts = report.get("charts") or []
+                caveat = next((chart.get("caveat") for chart in charts if chart.get("caveat")), None)
+                children = [
+                    loading,
+                    ui.div(
+                        ui.markdown(report.get("resumo_executivo") or ""),
+                        class_="srag-report-text",
+                        style="margin-top: 1rem;",
+                    ),
+                ]
+                if caveat:
+                    children.append(ui.p(caveat, class_="srag-report-caveat"))
+                return ui.div(*children)
 
             report = report_data.get()
             if not report:
