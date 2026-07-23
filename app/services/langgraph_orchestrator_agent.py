@@ -1,4 +1,5 @@
 import json
+import re
 import time
 import uuid
 from typing import Any
@@ -59,7 +60,7 @@ class LangGraphOrchestratorAgent:
         audit_service: AgentAuditService | None = None,
         checkpointer=None,
         graph=None,
-        max_chars: int = 4000,
+        max_chars: int = 5000,
     ) -> None:
         self.llm_service = llm_service or OpenAILangChainService()
         self.metrics_service = metrics_service or SragMetricsApiLangChainService()
@@ -86,32 +87,226 @@ class LangGraphOrchestratorAgent:
         scope = self._normalize_estado(estado)
         self.metrics_service.ensure_pipeline_ready()
         payload = self.metrics_service.get_full_metrics_data(scope)
-        news_data = self.news_service.buscar_noticias()
+        news_items = self._load_news_items()
+        news_data = self._format_news_for_llm(news_items)
         charts = self.chart_spec_service.from_metrics_payload(payload)
         self.chart_spec_service.generated_charts = list(charts)
 
         system_prompt = (
-            "Voce e um analista de saude publica. Produza um resumo executivo em portugues, "
-            "com no maximo 4000 caracteres, separando claramente 'Dados oficiais' e 'Noticias'. "
-            "No inicio, informe o escopo (UF ou BRASIL) e o periodo analisado "
-            "(mes_anterior -> mes_atual das metricas). "
-            "Mostre as 4 metricas principais e tendencias. Nao invente dados. "
-            "Mencione atraso de notificacao se a serie recente parecer incompleta."
+            "Voce e um analista de saude publica. Escreva um resumo executivo em portugues, "
+            "com no maximo 3500 caracteres, em tom humano e profissional, como um briefing "
+            "para gestores de saude. "
+            "Use secoes curtas com titulo em linha propria "
+            "(Escopo e periodo, Analise dos dados oficiais, Tendencias, Observacoes), "
+            "separadas por linha em branco. "
+            "IMPORTANTE: escreva apenas paragrafos corridos. "
+            "Nao use listas, bullets, tracos (-) nem enumeracoes (1., 2.). "
+            "Nao monte tabelas e nao liste noticias — a tabela de metricas e a secao de "
+            "noticias com links serao acrescentadas automaticamente depois. "
+            "Integre numeros e metricas naturalmente nas frases. "
+            "Cubra as 4 metricas principais e tendencias sem inventar dados. "
+            "Mencione atraso de notificacao se a serie recente parecer incompleta. "
+            "Use **negrito** com cuidado, so em numeros ou termos-chave."
         )
         user_prompt = (
             f"Estado consultado: {scope}\n\n"
             "Dados oficiais da API SRAG:\n"
             f"{json.dumps(payload, ensure_ascii=False, default=str)}\n\n"
-            "Noticias recentes coletadas:\n"
+            "Noticias recentes coletadas (apenas contexto; nao liste URLs):\n"
             f"{news_data}\n\n"
-            "Escreva o resumo executivo solicitado."
+            "Escreva o resumo executivo em prosa continua, sem listas, sem tabela e sem URLs."
         )
-        text = self.llm_service.ask(user_prompt, system_prompt=system_prompt)
+        narrative = self._limit_text(
+            self._humanize_report_text(self.llm_service.ask(user_prompt, system_prompt=system_prompt)),
+            max_chars=3500,
+        )
+        structured = "\n\n".join(
+            part
+            for part in (
+                self._format_metrics_table_markdown(payload),
+                self._format_news_section_markdown(news_items),
+            )
+            if part
+        )
+        resumo = narrative
+        if structured:
+            resumo = f"{narrative}\n\n{structured}".strip()
         return {
             "estado": scope,
-            "resumo_executivo": self._limit_text(text),
+            "resumo_executivo": self._limit_text(resumo),
             "charts": charts,
         }
+
+    def _load_news_items(self) -> list[dict[str, str]]:
+        listar = getattr(self.news_service, "listar_noticias", None)
+        if callable(listar):
+            try:
+                items = listar()
+                if isinstance(items, list):
+                    return [item for item in items if isinstance(item, dict)]
+            except Exception:  # noqa: BLE001
+                pass
+        raw = self.news_service.buscar_noticias()
+        return self._parse_news_text_fallback(str(raw or ""))
+
+    @staticmethod
+    def _format_news_for_llm(news_items: list[dict[str, str]]) -> str:
+        if not news_items:
+            return "Nenhuma noticia relevante sobre SRAG no Brasil foi encontrada."
+        lines = ["Noticias recentes sobre SRAG no Brasil:"]
+        for index, item in enumerate(news_items, start=1):
+            title = str(item.get("title") or "Sem titulo").strip()
+            snippet = str(item.get("snippet") or "").strip()
+            lines.append(f"{index}. {title}")
+            if snippet:
+                lines.append(f"   Resumo: {snippet}")
+        return "\n".join(lines)
+
+    @staticmethod
+    def _parse_news_text_fallback(raw: str) -> list[dict[str, str]]:
+        items: list[dict[str, str]] = []
+        current: dict[str, str] | None = None
+        for line in (raw or "").splitlines():
+            stripped = line.strip()
+            match = re.match(r"^(\d+)\.\s+(.+)$", stripped)
+            if match:
+                if current:
+                    items.append(current)
+                current = {"title": match.group(2).strip(), "url": "", "snippet": ""}
+                continue
+            if current is None:
+                continue
+            if stripped.lower().startswith("resumo:"):
+                current["snippet"] = stripped.split(":", 1)[1].strip()
+            elif stripped.lower().startswith("url:"):
+                current["url"] = stripped.split(":", 1)[1].strip()
+        if current:
+            items.append(current)
+        return items
+
+    @staticmethod
+    def _format_percent(value: Any) -> str:
+        if value is None:
+            return "N/D"
+        try:
+            number = float(value)
+        except (TypeError, ValueError):
+            return "N/D"
+        return f"{number:.2f}%".replace(".", ",")
+
+    @staticmethod
+    def _format_int(value: Any) -> str:
+        if value is None:
+            return "N/D"
+        try:
+            return f"{int(value):,}".replace(",", ".")
+        except (TypeError, ValueError):
+            return "N/D"
+
+    @staticmethod
+    def _format_month_year(ano: Any, mes: Any) -> str:
+        try:
+            return f"{int(mes):02d}/{int(ano)}"
+        except (TypeError, ValueError):
+            return "N/D"
+
+    def _format_metrics_table_markdown(self, payload: dict[str, Any]) -> str:
+        metricas = payload.get("metricas") or {}
+        if not isinstance(metricas, dict) or not metricas:
+            return ""
+
+        aumento = metricas.get("taxa_aumento_casos") or {}
+        mortalidade = metricas.get("taxa_mortalidade") or {}
+        uti = metricas.get("taxa_ocupacao_uti") or {}
+        vacina = metricas.get("taxa_vacinacao_populacao") or {}
+
+        if not isinstance(aumento, dict):
+            aumento = {}
+        if not isinstance(mortalidade, dict):
+            mortalidade = {}
+        if not isinstance(uti, dict):
+            uti = {}
+        if not isinstance(vacina, dict):
+            vacina = {}
+
+        periodo_aumento = (
+            f"{self._format_month_year(aumento.get('mes_anterior_ano'), aumento.get('mes_anterior_mes'))}"
+            f" → {self._format_month_year(aumento.get('mes_atual_ano'), aumento.get('mes_atual_mes'))}"
+        )
+        detalhe_aumento = (
+            f"{periodo_aumento}; "
+            f"{self._format_int(aumento.get('casos_mes_anterior'))} → "
+            f"{self._format_int(aumento.get('casos_mes_atual'))} casos"
+        )
+        periodo_2m = (
+            f"{self._format_month_year(mortalidade.get('mes_anterior_ano'), mortalidade.get('mes_anterior_mes'))}"
+            f" → {self._format_month_year(mortalidade.get('mes_atual_ano'), mortalidade.get('mes_atual_mes'))}"
+        )
+
+        rows = [
+            (
+                "Taxa de aumento de casos",
+                self._format_percent(aumento.get("taxa_aumento_percentual")),
+                detalhe_aumento,
+            ),
+            (
+                "Taxa de mortalidade",
+                self._format_percent(mortalidade.get("taxa_mortalidade_percentual")),
+                (
+                    f"{periodo_2m}; "
+                    f"{self._format_int(mortalidade.get('total_obitos_2_meses'))} óbitos / "
+                    f"{self._format_int(mortalidade.get('total_casos_2_meses'))} casos"
+                ),
+            ),
+            (
+                "Taxa de ocupação de UTI",
+                self._format_percent(uti.get("taxa_ocupacao_uti_percentual")),
+                (
+                    f"{self._format_int(uti.get('casos_com_uti_2_meses'))} internados em UTI / "
+                    f"{self._format_int(uti.get('total_casos_2_meses'))} casos"
+                ),
+            ),
+            (
+                "Taxa de vacinação COVID",
+                self._format_percent(vacina.get("taxa_vacinacao_percentual")),
+                (
+                    f"{self._format_int(vacina.get('casos_vacinados_2_meses'))} vacinados / "
+                    f"{self._format_int(vacina.get('total_casos_2_meses'))} casos"
+                ),
+            ),
+        ]
+
+        lines = [
+            "## Quatro métricas principais",
+            "",
+            "| Métrica | Valor | Detalhe |",
+            "| --- | --- | --- |",
+        ]
+        for metric, value, detail in rows:
+            lines.append(f"| {metric} | {value} | {detail} |")
+        return "\n".join(lines)
+
+    @staticmethod
+    def _format_news_section_markdown(news_items: list[dict[str, str]]) -> str:
+        lines = ["## Notícias encontradas", ""]
+        if not news_items:
+            lines.append("Nenhuma notícia relevante sobre SRAG no Brasil foi encontrada.")
+            return "\n".join(lines)
+
+        for index, item in enumerate(news_items, start=1):
+            title = str(item.get("title") or "Sem título").strip() or "Sem título"
+            url = str(item.get("url") or "").strip()
+            snippet = str(item.get("snippet") or "").strip()
+            if url:
+                lines.append(f"{index}. [{title}]({url})")
+            else:
+                lines.append(f"{index}. {title}")
+            if snippet:
+                lines.append(f"   {snippet}")
+            if url:
+                lines.append(f"   Link: {url}")
+            lines.append("")
+        return "\n".join(lines).rstrip()
 
     def _report_tool(self):
         def gerar_relatorio_executivo(estado: str) -> str:
@@ -266,12 +461,79 @@ class LangGraphOrchestratorAgent:
         events.extend(pending.values())
         return events
 
-    def _limit_text(self, text: str) -> str:
+    def _humanize_report_text(self, text: str) -> str:
+        """Converte blocos em lista em paragrafos corridos, mais naturais para leitura."""
+        compact = (text or "").replace("\r\n", "\n").replace("\r", "\n").strip()
+        if not compact:
+            return ""
+
+        bullet_re = re.compile(r"^([-*•]|\d+\.)\s+")
+        blocks = re.split(r"\n{2,}", compact)
+        rendered: list[str] = []
+
+        for block in blocks:
+            lines = [line.strip() for line in block.split("\n") if line.strip()]
+            if not lines:
+                continue
+
+            # Preserva tabelas markdown e secoes ja estruturadas com links.
+            if any(line.startswith("|") for line in lines) or any("](" in line for line in lines):
+                rendered.append("\n".join(lines))
+                continue
+
+            bullet_lines = [line for line in lines if bullet_re.match(line)]
+            if len(bullet_lines) >= 2:
+                heading_parts: list[str] = []
+                items: list[str] = []
+                for line in lines:
+                    if bullet_re.match(line):
+                        item = bullet_re.sub("", line).strip().rstrip(";")
+                        if item:
+                            items.append(item)
+                    elif not items:
+                        heading = re.sub(r"^#{1,6}\s*", "", line)
+                        if heading.startswith("**") and heading.endswith("**") and heading.count("**") == 2:
+                            heading = heading[2:-2].strip()
+                        heading_parts.append(heading.rstrip(":"))
+                    else:
+                        items.append(line)
+
+                sentences: list[str] = []
+                for item in items:
+                    sentence = item.strip()
+                    if not sentence:
+                        continue
+                    if not sentence.endswith((".", "!", "?")):
+                        sentence = f"{sentence}."
+                    sentence = sentence[0].upper() + sentence[1:]
+                    sentences.append(sentence)
+
+                if heading_parts:
+                    rendered.append(" ".join(heading_parts).strip())
+                if sentences:
+                    rendered.append(" ".join(sentences))
+                continue
+
+            cleaned_lines: list[str] = []
+            for line in lines:
+                if bullet_re.match(line):
+                    item = bullet_re.sub("", line).strip()
+                    if item and not item.endswith((".", "!", "?")):
+                        item = f"{item}."
+                    cleaned_lines.append(item)
+                else:
+                    cleaned_lines.append(line)
+            rendered.append("\n".join(cleaned_lines))
+
+        return "\n\n".join(rendered)
+
+    def _limit_text(self, text: str, max_chars: int | None = None) -> str:
+        limit = self.max_chars if max_chars is None else max_chars
         compact = text.strip()
-        if len(compact) <= self.max_chars:
+        if len(compact) <= limit:
             return compact
 
-        truncated = compact[: self.max_chars - 3].rstrip()
+        truncated = compact[: limit - 3].rstrip()
         if " " in truncated:
             truncated = truncated.rsplit(" ", 1)[0]
         return f"{truncated}..."

@@ -15,6 +15,8 @@ from shinywidgets import render_plotly
 from shiny_app.constants import (
     API_BASE_URL,
     PIPELINE_TIMEOUT_SECONDS,
+    detect_scope_from_text,
+    scope_label,
 )
 
 ui.page_opts(
@@ -100,6 +102,12 @@ ui.tags.style(
         gap: 0.75rem;
         margin-bottom: 1rem;
     }
+    .srag-chat-messages {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+        width: 100%;
+    }
     .srag-chat-bubble {
         border-radius: 0.5rem;
         padding: 0.75rem 1rem;
@@ -135,6 +143,22 @@ ui.tags.style(
         flex-wrap: wrap;
         gap: 0.5rem;
         margin-top: 0.75rem;
+    }
+    #srag-pdf-offer-host {
+        display: none;
+        width: 100%;
+        flex-shrink: 0;
+    }
+    .srag-chat-pdf-bubble {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+        align-self: flex-start;
+        max-width: 95%;
+    }
+    .srag-chat-pdf-bubble .shiny-download-link,
+    .srag-chat-pdf-bubble a.btn {
+        align-self: flex-start;
     }
     """
 )
@@ -175,6 +199,7 @@ pipeline_phase = reactive.Value("checking")
 pipeline_error = reactive.Value("")
 report_data = reactive.Value(None)
 report_generating = reactive.Value(False)
+report_scope = reactive.Value(None)
 chat_session_id = reactive.Value(str(uuid.uuid4()))
 chat_messages = reactive.Value([])
 chat_error = reactive.Value("")
@@ -184,6 +209,49 @@ chat_awaiting_reply = reactive.Value(False)
 def _api_url(path: str) -> str:
     return f"{API_BASE_URL.rstrip('/')}{path}"
 
+
+def _is_report_request(message: str) -> bool:
+    lowered = (message or "").casefold()
+    return any(
+        hint in lowered
+        for hint in ("relatório", "relatorio", "resumo executivo", "painel completo")
+    )
+
+
+def _update_report_scope(*texts: str) -> None:
+    for text in texts:
+        detected = detect_scope_from_text(text or "")
+        if detected:
+            report_scope.set(detected)
+            return
+
+
+def _send_chat_message(message: str) -> None:
+    if pipeline_phase.get() != "ready":
+        chat_error.set("Aguarde a conclusão do pipeline antes de usar o chat.")
+        return
+
+    if chat_awaiting_reply.get() or chat_task.status() == "running":
+        chat_error.set("Aguarde a resposta atual do chatbot.")
+        return
+
+    text = (message or "").strip()
+    if not text:
+        chat_error.set("Digite uma mensagem para o chatbot.")
+        return
+
+    chat_error.set("")
+    _update_report_scope(text)
+    history = list(chat_messages.get())
+    history.append({"role": "user", "content": text})
+    chat_messages.set(history)
+    chat_awaiting_reply.set(True)
+    report_generating.set(_is_report_request(text))
+    chat_task.invoke(
+        chat_session_id.get(),
+        text,
+        report_scope.get() or "BRASIL",
+    )
 
 def _fetch_pipeline_status() -> dict:
     try:
@@ -217,7 +285,7 @@ async def run_pipeline_task() -> dict:
 
 
 @reactive.extended_task
-async def chat_task(session_id: str, message: str) -> dict:
+async def chat_task(session_id: str, message: str, estado_contexto: str) -> dict:
     try:
         async with httpx.AsyncClient(timeout=PIPELINE_TIMEOUT_SECONDS) as client:
             response = await client.post(
@@ -225,6 +293,7 @@ async def chat_task(session_id: str, message: str) -> dict:
                 json={
                     "session_id": session_id,
                     "message": message,
+                    "estado_contexto": estado_contexto or "BRASIL",
                 },
             )
             response.raise_for_status()
@@ -301,38 +370,19 @@ def reset_chat_session() -> None:
     chat_error.set("")
     chat_awaiting_reply.set(False)
     report_generating.set(False)
+    report_scope.set(None)
+    report_data.set(None)
 
 
 @reactive.effect
 @reactive.event(input.enviar_chat)
 def trigger_chat_message() -> None:
-    if pipeline_phase.get() != "ready":
-        chat_error.set("Aguarde a conclusão do pipeline antes de usar o chat.")
-        return
-
-    if chat_awaiting_reply.get() or chat_task.status() == "running":
-        chat_error.set("Aguarde a resposta atual do chatbot.")
-        return
-
     message = (input.chat_message() or "").strip()
     if not message:
         chat_error.set("Digite uma mensagem para o chatbot.")
         return
-
-    chat_error.set("")
-    history = list(chat_messages.get())
-    history.append({"role": "user", "content": message})
-    chat_messages.set(history)
-    chat_awaiting_reply.set(True)
-    lowered = message.casefold()
-    report_generating.set(
-        any(
-            hint in lowered
-            for hint in ("relatório", "relatorio", "resumo executivo", "painel completo")
-        )
-    )
     ui.update_text_area("chat_message", value="")
-    chat_task.invoke(chat_session_id.get(), message)
+    _send_chat_message(message)
 
 
 @reactive.effect
@@ -362,10 +412,20 @@ def consume_chat_task_result() -> None:
     if data.get("session_id"):
         chat_session_id.set(data["session_id"])
 
+    estado = (data.get("estado_contexto") or "").strip().upper()
+    if estado:
+        report_scope.set(estado)
+    else:
+        _update_report_scope(data.get("reply") or "")
+
     tools = data.get("tools_used") or []
+    report = data.get("report")
     # So atualiza a secao de relatorio quando um novo report veio nesta rodada.
-    if data.get("report"):
-        report_data.set(data["report"])
+    if report:
+        report_data.set(report)
+        report_estado = (report.get("estado") or "").strip().upper()
+        if report_estado:
+            report_scope.set(report_estado)
 
     history = list(chat_messages.get())
     history.append(
@@ -373,6 +433,8 @@ def consume_chat_task_result() -> None:
             "role": "assistant",
             "content": data.get("reply") or "",
             "tools_used": tools,
+            "offer_pdf": bool(report),
+            "report_estado": (report or {}).get("estado"),
         }
     )
     chat_messages.set(history)
@@ -406,11 +468,34 @@ def _find_report_chart(chart_id: str) -> dict | None:
     report = report_data.get()
     if not report:
         return None
-    charts = report.get("charts") or []
-    for chart in charts:
+    for chart in _normalize_report_charts(report.get("charts") or []):
         if chart.get("id") == chart_id:
             return chart
     return None
+
+
+def _normalize_report_charts(charts: list) -> list[dict]:
+    normalized: list[dict] = []
+    for chart in charts:
+        if hasattr(chart, "model_dump"):
+            normalized.append(chart.model_dump())
+        elif isinstance(chart, dict):
+            normalized.append(chart)
+    return normalized
+
+
+_CHART_HEADER_FALLBACKS = {
+    "casos_diarios": "Gráfico do relatório — casos diários (últimos 30 dias)",
+    "casos_mensais": "Gráfico do relatório — casos mensais (últimos 12 meses)",
+}
+
+
+def _chart_card_header(chart: dict) -> str:
+    title = (chart.get("title") or "").strip()
+    if title:
+        return title
+    chart_id = chart.get("id") or ""
+    return _CHART_HEADER_FALLBACKS.get(chart_id, "Gráfico SRAG")
 
 
 def _figure_from_chart_spec(chart: dict | None, empty_message: str) -> go.Figure:
@@ -451,14 +536,16 @@ def _figure_from_chart_spec(chart: dict | None, empty_message: str) -> go.Figure
         )
 
     fig.update_layout(
-        title=dict(text=chart.get("title") or "", font=dict(size=14)),
+        title=None,
         height=320,
-        margin=dict(t=40, r=20, l=20, b=20),
+        margin=dict(t=20, r=20, l=20, b=20),
         xaxis_title=x_label,
         yaxis_title=y_label,
+        yaxis=dict(rangemode="tozero"),
         showlegend=False,
     )
     return fig
+
 
 
 with ui.div():
@@ -473,7 +560,8 @@ with ui.div(class_="srag-main"):
     with ui.div(class_="srag-header"):
         ui.h2("Agente Chatbot - Monitor de Saúde SRAG", class_="srag-page-title")
         ui.p(
-            "Peça análises ou um relatório executivo no chatbot — informe uma UF (ex.: SP, Pernambuco e etc.) ou Brasil.",
+            "Peça análises ou um relatório executivo no chatbot — informe uma UF (ex.: SP, Pernambuco) ou Brasil. "
+            "Quando o relatório for gerado, o download em PDF aparece em uma bolha (ou balão) do chat.",
             class_="srag-page-subtitle",
         )
 
@@ -496,55 +584,151 @@ with ui.div(class_="srag-main"):
         ui.card_header("Chatbot")
 
         @render.ui
-        def chat_panel():
+        def chat_not_ready():
+            if pipeline_phase.get() == "ready":
+                return ui.div()
+            return ui.p(
+                "Aguarde a preparação dos dados para usar o chatbot.",
+                class_="srag-page-subtitle",
+            )
+
+        @render.ui
+        def chat_empty_hint():
             if pipeline_phase.get() != "ready":
-                return ui.p(
-                    "Aguarde a preparação dos dados para usar o chatbot.",
-                    class_="srag-page-subtitle",
-                )
+                return ui.div()
+            if chat_messages.get() or chat_awaiting_reply.get() or chat_task.status() == "running":
+                return ui.div()
+            return ui.p(
+                "Pergunte sobre métricas/tendências ou peça um relatório executivo "
+                "citando a UF (ex.: SP, Pernambuco) ou Brasil. O relatório completo aparece na seção abaixo; "
+                "o PDF pode ser baixado pela bolha do chat.",
+                class_="srag-page-subtitle",
+            )
 
-            bubbles = []
-            for item in chat_messages.get():
-                role = item.get("role")
-                css = "srag-chat-bubble srag-chat-user" if role == "user" else "srag-chat-bubble srag-chat-assistant"
-                label = "Você" if role == "user" else "Assistente"
-                children = [ui.strong(label), ui.p(item.get("content") or "", style="margin-bottom: 0;")]
-                tools = item.get("tools_used") or []
-                if tools:
-                    children.append(ui.p(f"Tools: {', '.join(tools)}", class_="srag-chat-tools"))
-                bubbles.append(ui.div(*children, class_=css))
+        with ui.div(class_="srag-chat-log", id="srag-chat-log"):
+            @render.ui
+            def chat_message_bubbles():
+                if pipeline_phase.get() != "ready":
+                    return ui.div()
 
-            if chat_awaiting_reply.get() or chat_task.status() == "running":
-                bubbles.append(
-                    ui.div(
-                        ui.strong("Assistente"),
-                        ui.p("Consultando tools e gerando resposta...", style="margin-bottom: 0;"),
-                        class_="srag-chat-bubble srag-chat-assistant srag-loading",
+                bubbles = []
+                for item in chat_messages.get():
+                    role = item.get("role")
+                    css = (
+                        "srag-chat-bubble srag-chat-user"
+                        if role == "user"
+                        else "srag-chat-bubble srag-chat-assistant"
                     )
-                )
+                    label = "Você" if role == "user" else "Assistente"
+                    children = [
+                        ui.strong(label),
+                        ui.p(item.get("content") or "", style="margin-bottom: 0;"),
+                    ]
+                    tools = item.get("tools_used") or []
+                    if tools:
+                        children.append(
+                            ui.p(f"Tools: {', '.join(tools)}", class_="srag-chat-tools")
+                        )
+                    bubbles.append(ui.div(*children, class_=css))
 
-            body = []
-            if not bubbles:
-                body.append(
-                    ui.p(
-                        "Pergunte sobre métricas/tendências ou peça um relatório executivo "
-                        "citando a UF (ex.: SP, Pernambuco e etc.) ou Brasil. O relatório completo aparece na seção abaixo.",
-                        class_="srag-page-subtitle",
+                if chat_awaiting_reply.get() or chat_task.status() == "running":
+                    bubbles.append(
+                        ui.div(
+                            ui.strong("Assistente"),
+                            ui.p(
+                                "Consultando tools e gerando resposta...",
+                                style="margin-bottom: 0;",
+                            ),
+                            class_="srag-chat-bubble srag-chat-assistant srag-loading",
+                        )
                     )
-                )
-            else:
-                body.append(ui.div(*bubbles, class_="srag-chat-log", id="srag-chat-log"))
 
+                if not bubbles:
+                    return ui.div()
+                return ui.div(*bubbles, class_="srag-chat-messages")
+
+            @render.ui
+            def chat_pdf_offer_visibility():
+                report = report_data.get()
+                visible = (
+                    bool(report)
+                    and pipeline_phase.get() == "ready"
+                    and bool(chat_messages.get())
+                )
+                if visible:
+                    return ui.tags.style(
+                        "#srag-pdf-offer-host { display: block !important; }"
+                    )
+                return ui.tags.style(
+                    "#srag-pdf-offer-host { display: none !important; }"
+                )
+
+            with ui.div(id="srag-pdf-offer-host"):
+                with ui.div(class_="srag-chat-bubble srag-chat-assistant srag-chat-pdf-bubble"):
+                    @render.ui
+                    def chat_pdf_offer_text():
+                        report = report_data.get()
+                        if not report or pipeline_phase.get() != "ready":
+                            return ui.div()
+                        estado = report.get("estado") or "BRASIL"
+                        return ui.div(
+                            ui.strong("Assistente"),
+                            ui.p(
+                                f"O relatório executivo de {scope_label(estado)} está pronto. "
+                                "Baixe o PDF abaixo — o texto completo também está na seção "
+                                "Relatório gerado por IA.",
+                                style="margin-bottom: 0.35rem;",
+                            ),
+                        )
+
+                    @render.download(
+                        label="Baixar PDF",
+                        filename=lambda: (
+                            f"relatorio_srag_{(report_data.get() or {}).get('estado', 'BRASIL')}.pdf"
+                        ),
+                        media_type="application/pdf",
+                    )
+                    def baixar_relatorio_pdf():
+                        report = report_data.get()
+                        if not report:
+                            raise ValueError(
+                                "Nenhum relatório disponível. Peça um relatório no chatbot antes de baixar o PDF."
+                            )
+
+                        charts = report.get("charts") or []
+                        serialized_charts = []
+                        for chart in charts:
+                            if hasattr(chart, "model_dump"):
+                                serialized_charts.append(chart.model_dump())
+                            else:
+                                serialized_charts.append(chart)
+
+                        with httpx.Client(timeout=60.0) as client:
+                            response = client.post(
+                                _api_url("/agents/report/pdf"),
+                                json={
+                                    "estado": report.get("estado") or "BRASIL",
+                                    "resumo_executivo": report.get("resumo_executivo") or "",
+                                    "charts": serialized_charts,
+                                },
+                            )
+                            response.raise_for_status()
+                            yield response.content
+
+        @render.ui
+        def chat_footer():
+            if pipeline_phase.get() != "ready":
+                return ui.div()
+            parts = []
             if chat_error.get():
-                body.append(ui.p(chat_error.get(), class_="srag-error"))
-
-            body.append(ui.p(f"Sessão: {chat_session_id.get()}", class_="srag-chat-meta"))
-            return ui.div(*body)
+                parts.append(ui.p(chat_error.get(), class_="srag-error"))
+            parts.append(ui.p(f"Sessão: {chat_session_id.get()}", class_="srag-chat-meta"))
+            return ui.div(*parts)
 
         ui.input_text_area(
             "chat_message",
             label="Mensagem",
-            placeholder='Ex.: "Gere o relatório executivo de SP" ou "Como está a mortalidade no Brasil?"',
+            placeholder='Ex.: "Como está a mortalidade em SP?" ou "Gere o relatório do Brasil"',
             rows=3,
             width="100%",
         )
@@ -598,7 +782,7 @@ with ui.div(class_="srag-main"):
                     class_="srag-page-subtitle",
                 )
 
-            charts = report.get("charts") or []
+            charts = _normalize_report_charts(report.get("charts") or [])
             caveat = next((chart.get("caveat") for chart in charts if chart.get("caveat")), None)
             children = [
                 ui.div(
@@ -610,24 +794,50 @@ with ui.div(class_="srag-main"):
                 children.append(ui.p(caveat, class_="srag-report-caveat"))
             return ui.div(*children)
 
-        with ui.div(class_="srag-report-charts"):
+        @render.ui
+        def report_charts_visibility():
+            report = report_data.get()
+            charts = _normalize_report_charts((report or {}).get("charts") or [])
+            visible = pipeline_phase.get() == "ready" and bool(charts)
+            display = "block" if visible else "none"
+            return ui.tags.style(
+                f"#srag-report-charts-host {{ display: {display} !important; }}"
+            )
+
+        with ui.div(id="srag-report-charts-host", class_="srag-report-charts"):
             with ui.layout_columns(col_widths=(6, 6)):
                 with ui.card(full_screen=True):
-                    ui.card_header("Gráfico do relatório — casos diários (últimos 30 dias)")
+                    @render.ui
+                    def report_chart_diarios_header():
+                        chart = _find_report_chart("casos_diarios")
+                        title = (
+                            _chart_card_header(chart)
+                            if chart
+                            else _CHART_HEADER_FALLBACKS["casos_diarios"]
+                        )
+                        return ui.div(title, class_="card-header")
 
                     @render_plotly
                     def report_chart_casos_diarios():
                         return _figure_from_chart_spec(
                             _find_report_chart("casos_diarios"),
-                            "Peça um relatório no chatbot para visualizar o gráfico diário.",
+                            "Aguardando dados do gráfico diário.",
                         )
 
                 with ui.card(full_screen=True):
-                    ui.card_header("Gráfico do relatório — casos mensais (últimos 12 meses)")
+                    @render.ui
+                    def report_chart_mensais_header():
+                        chart = _find_report_chart("casos_mensais")
+                        title = (
+                            _chart_card_header(chart)
+                            if chart
+                            else _CHART_HEADER_FALLBACKS["casos_mensais"]
+                        )
+                        return ui.div(title, class_="card-header")
 
                     @render_plotly
                     def report_chart_casos_mensais():
                         return _figure_from_chart_spec(
                             _find_report_chart("casos_mensais"),
-                            "Peça um relatório no chatbot para visualizar o gráfico mensal.",
+                            "Aguardando dados do gráfico mensal.",
                         )

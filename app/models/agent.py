@@ -12,7 +12,7 @@ class ExecutiveSummaryResponse(BaseModel):
     resumo_executivo: str = Field(description="Resumo executivo gerado pelo agente.")
     charts: list[ChartSpec] = Field(
         default_factory=list,
-        description="Especificações de gráficos oficiais associados ao relatório.",
+        description="Especificações de gráficos SRAG associados ao relatório.",
     )
     audit_id: str | None = Field(
         default=None,

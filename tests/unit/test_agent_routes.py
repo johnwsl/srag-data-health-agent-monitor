@@ -22,7 +22,7 @@ def mock_orchestrator() -> MagicMock:
             ChartSpec(
                 id="casos_diarios",
                 type="line",
-                title="Casos diários de SRAG — SP",
+                title="Casos diários de SRAG (últimos 30 dias) — SP",
                 x=ChartAxisSpec(field="data", label="Data"),
                 y=ChartAxisSpec(field="casos", label="Notificações"),
                 data=[{"data": "2026-06-01", "casos": 2}],
@@ -41,7 +41,7 @@ def mock_orchestrator() -> MagicMock:
             ChartSpec(
                 id="casos_mensais",
                 type="bar",
-                title="Casos mensais — SP",
+                title="Casos mensais de SRAG (últimos 12 meses) — SP",
                 x=ChartAxisSpec(field="label", label="Mês"),
                 y=ChartAxisSpec(field="casos", label="Notificações"),
                 data=[{"label": "06/2026", "casos": 10}],
@@ -80,6 +80,46 @@ def test_generate_report_returns_summary(client, mock_orchestrator):
     assert payload["charts"][0]["id"] == "casos_diarios"
     assert payload["audit_id"] == "audit-report-1"
     mock_orchestrator.generate_executive_summary.assert_called_once_with("SP")
+
+
+def test_export_report_pdf_returns_pdf_bytes(client):
+    response = client.post(
+        "/agents/report/pdf",
+        json={
+            "estado": "SP",
+            "resumo_executivo": "Escopo SP. Dados oficiais e noticias.",
+            "charts": [
+                {
+                    "id": "casos_diarios",
+                    "type": "line",
+                    "title": "Casos diários — SP",
+                    "x": {"field": "data", "label": "Data"},
+                    "y": {"field": "casos", "label": "Casos"},
+                    "data": [
+                        {"data": "2026-06-01", "casos": 2},
+                        {"data": "2026-06-02", "casos": 3},
+                    ],
+                    "source": "GET /metrics/SP/casos-diarios",
+                    "caveat": "Atraso de notificação possível.",
+                }
+            ],
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("application/pdf")
+    assert "relatorio_srag_SP.pdf" in response.headers.get("content-disposition", "")
+    assert response.content.startswith(b"%PDF")
+
+
+def test_export_report_pdf_requires_resumo(client):
+    response = client.post(
+        "/agents/report/pdf",
+        json={"estado": "SP", "resumo_executivo": "   ", "charts": []},
+    )
+
+    assert response.status_code == 422
+    assert "resumo_executivo" in response.json()["detail"]
 
 
 def test_generate_report_returns_422_for_invalid_state(client, mock_orchestrator):
