@@ -2,16 +2,16 @@ from fastapi import HTTPException, status
 
 from app.models.agent import ExecutiveSummaryRequest, ExecutiveSummaryResponse
 from app.models.chat import ChatReportPayload, ChatRequest, ChatResponse
-from app.services.srag_langgraph_agent import SragLangGraphAgent
+from app.services.langgraph_orchestrator_agent import LangGraphOrchestratorAgent
 
 
 class AgentController:
-    def __init__(self, orchestrator: SragLangGraphAgent | None = None):
+    def __init__(self, orchestrator: LangGraphOrchestratorAgent | None = None):
         self.orchestrator = orchestrator
 
-    def _get_orchestrator(self) -> SragLangGraphAgent:
+    def _get_orchestrator(self) -> LangGraphOrchestratorAgent:
         if self.orchestrator is None:
-            self.orchestrator = SragLangGraphAgent()
+            self.orchestrator = LangGraphOrchestratorAgent()
         return self.orchestrator
 
     def generate_report(self, payload: ExecutiveSummaryRequest) -> ExecutiveSummaryResponse:

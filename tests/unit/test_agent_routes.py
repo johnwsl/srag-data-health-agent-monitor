@@ -6,13 +6,13 @@ from fastapi.testclient import TestClient
 from app.controllers.agent_controller import AgentController
 from app.main import app
 from app.models.chart import ChartAxisSpec, ChartSpec
-from app.services.srag_langgraph_agent import SragLangGraphAgent
+from app.services.langgraph_orchestrator_agent import LangGraphOrchestratorAgent
 from app.views import agent_routes
 
 
 @pytest.fixture
 def mock_orchestrator() -> MagicMock:
-    agent = MagicMock(spec=SragLangGraphAgent)
+    agent = MagicMock(spec=LangGraphOrchestratorAgent)
     agent.generate_executive_summary.return_value = {
         "resumo_executivo": (
             "Panorama geral.\nDados oficiais: taxa de aumento, mortalidade, UTI e vacinacao.\n"

@@ -20,7 +20,7 @@ O fluxo segue o padrão MVC já adotado no projeto:
 |--------|---------|------------------|
 | Rota | `app/views/agent_routes.py` | Expõe `POST /agents/report` e `POST /agents/chat` |
 | Controller | `app/controllers/agent_controller.py` | Valida entrada e trata erros HTTP |
-| Orquestrador | `app/services/srag_langgraph_agent.py` | Orquestrador unico LangGraph (relatorio + chat + Tavily) |
+| Orquestrador | `app/services/langgraph_orchestrator_agent.py` | Orquestrador unico LangGraph (relatorio + chat + Tavily) |
 | Facades | `srag_report_agent.py`, `srag_chat_agent.py` | Atalhos de compatibilidade do mesmo orquestrador |
 | Modelos | `app/models/agent.py`, `app/models/chat.py` | Request/response de relatorio e chat |
 | ChartSpec | `app/models/chart.py` + `app/services/chart_spec_service.py` | Contrato e montagem dos gráficos oficiais |
@@ -29,7 +29,7 @@ O fluxo segue o padrão MVC já adotado no projeto:
 
 | Classe | Arquivo | Responsabilidade |
 |--------|---------|------------------|
-| `SragLangGraphAgent` | `app/services/srag_langgraph_agent.py` | Orquestrador unico (`create_react_agent` + MemorySaver) |
+| `LangGraphOrchestratorAgent` | `app/services/langgraph_orchestrator_agent.py` | Orquestrador unico (`create_react_agent` + MemorySaver) |
 | `OpenAILangChainService` | `app/services/openai_langchain_service.py` | Chat model OpenAI via LangChain (`ChatOpenAI`) |
 | `SragMetricsApiLangChainService` | `app/services/srag_metrics_api_service.py` | Cliente HTTP da API SRAG como tools |
 | `ChartSpecService` | `app/services/chart_spec_service.py` | Monta ChartSpec / tool `gerar_especificacao_grafico` |
@@ -255,7 +255,7 @@ Os gráficos (`ChartSpec`) são montados por `ChartSpecService` a partir das sé
 
 ## Chatbot LangGraph (`POST /agents/chat`)
 
-O chatbot multi-turno usa o **mesmo** `SragLangGraphAgent` do relatório (`create_react_agent` + `MemorySaver` + tools, incluindo Tavily).
+O chatbot multi-turno usa o **mesmo** `LangGraphOrchestratorAgent` do relatório (`create_react_agent` + `MemorySaver` + tools, incluindo Tavily).
 
 ### Requisição
 

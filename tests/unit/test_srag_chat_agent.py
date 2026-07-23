@@ -4,7 +4,7 @@ from unittest.mock import MagicMock
 from app.models.chart import ChartAxisSpec, ChartSpec
 from app.services.chart_spec_service import ChartSpecService
 from app.services.srag_chat_agent import SragChatAgent
-from app.services.srag_langgraph_agent import SragLangGraphAgent
+from app.services.langgraph_orchestrator_agent import LangGraphOrchestratorAgent
 
 
 class FakeMetricsService:
@@ -60,7 +60,7 @@ def test_chat_agent_invokes_langgraph_and_returns_charts():
 
     fake_graph.invoke.side_effect = _invoke
     metrics_service = FakeMetricsService()
-    orchestrator = SragLangGraphAgent(
+    orchestrator = LangGraphOrchestratorAgent(
         llm_service=MagicMock(),
         metrics_service=metrics_service,
         news_service=MagicMock(),
@@ -89,7 +89,7 @@ def test_chat_agent_invokes_langgraph_and_returns_charts():
 
 def test_chat_agent_rejects_empty_message():
     agent = SragChatAgent(
-        orchestrator=SragLangGraphAgent(
+        orchestrator=LangGraphOrchestratorAgent(
             llm_service=MagicMock(),
             metrics_service=FakeMetricsService(),
             news_service=MagicMock(),
@@ -111,7 +111,7 @@ def test_chat_agent_creates_session_id_when_missing():
         "messages": [SimpleNamespace(type="ai", content="Resposta", tool_calls=[])]
     }
     agent = SragChatAgent(
-        orchestrator=SragLangGraphAgent(
+        orchestrator=LangGraphOrchestratorAgent(
             llm_service=MagicMock(),
             metrics_service=FakeMetricsService(),
             news_service=MagicMock(),
@@ -164,7 +164,7 @@ def test_chat_with_report_tool_exposes_report_not_in_chat_charts():
         }
     )
 
-    orchestrator = SragLangGraphAgent(
+    orchestrator = LangGraphOrchestratorAgent(
         llm_service=llm,
         metrics_service=metrics,
         news_service=news,
@@ -212,7 +212,7 @@ def test_same_orchestrator_serves_report_and_chat():
             "casos_mensais": {"pontos": []},
         }
     )
-    orchestrator = SragLangGraphAgent(
+    orchestrator = LangGraphOrchestratorAgent(
         llm_service=llm,
         metrics_service=metrics,
         news_service=news,

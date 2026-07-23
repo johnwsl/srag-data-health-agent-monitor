@@ -19,7 +19,7 @@ class ReportToolInput(BaseModel):
     )
 
 
-class SragLangGraphAgent:
+class LangGraphOrchestratorAgent:
     """Orquestrador unico LangGraph para chat e relatorio (tools + Tavily)."""
 
     SYSTEM_PROMPT = (
@@ -67,7 +67,7 @@ class SragLangGraphAgent:
                 from langgraph.checkpoint.memory import MemorySaver
             except ImportError as exc:
                 raise ImportError(
-                    "Dependencia ausente. Instale 'langgraph' para usar SragLangGraphAgent."
+                    "Dependencia ausente. Instale 'langgraph' para usar LangGraphOrchestratorAgent."
                 ) from exc
             self._checkpointer = MemorySaver()
         return self._checkpointer
@@ -153,7 +153,7 @@ class SragLangGraphAgent:
             from langgraph.prebuilt import create_react_agent
         except ImportError as exc:
             raise ImportError(
-                "Dependencia ausente. Instale 'langgraph' para usar SragLangGraphAgent."
+                "Dependencia ausente. Instale 'langgraph' para usar LangGraphOrchestratorAgent."
             ) from exc
 
         tools = [

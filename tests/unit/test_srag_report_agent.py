@@ -1,7 +1,7 @@
 from unittest.mock import MagicMock
 
 from app.services.chart_spec_service import ChartSpecService
-from app.services.srag_langgraph_agent import SragLangGraphAgent
+from app.services.langgraph_orchestrator_agent import LangGraphOrchestratorAgent
 from app.services.srag_report_agent import SragReportAgent
 
 
@@ -51,7 +51,7 @@ def test_generate_executive_summary_composes_report_with_llm():
     llm.ask.return_value = "Resumo executivo.\nDados oficiais: ...\nNoticias: ..."
     news = MagicMock()
     news.buscar_noticias.return_value = "Sem eventos criticos."
-    orchestrator = SragLangGraphAgent(
+    orchestrator = LangGraphOrchestratorAgent(
         llm_service=llm,
         metrics_service=metrics_service,
         news_service=news,
@@ -76,7 +76,7 @@ def test_generate_executive_summary_limits_output_to_4000_chars():
     news = MagicMock()
     news.buscar_noticias.return_value = "Noticias."
     metrics_service = FakeMetricsService(SAMPLE_METRICS_PAYLOAD)
-    orchestrator = SragLangGraphAgent(
+    orchestrator = LangGraphOrchestratorAgent(
         llm_service=llm,
         metrics_service=metrics_service,
         news_service=news,
@@ -97,7 +97,7 @@ def test_generate_executive_summary_includes_charts_from_metrics():
     news = MagicMock()
     news.buscar_noticias.return_value = "Noticias."
     metrics_service = FakeMetricsService(SAMPLE_METRICS_PAYLOAD)
-    orchestrator = SragLangGraphAgent(
+    orchestrator = LangGraphOrchestratorAgent(
         llm_service=llm,
         metrics_service=metrics_service,
         news_service=news,
@@ -113,7 +113,7 @@ def test_generate_executive_summary_includes_charts_from_metrics():
 
 
 def test_generate_executive_summary_rejects_invalid_uf():
-    orchestrator = SragLangGraphAgent(
+    orchestrator = LangGraphOrchestratorAgent(
         llm_service=MagicMock(),
         metrics_service=FakeMetricsService(SAMPLE_METRICS_PAYLOAD),
         news_service=MagicMock(),
