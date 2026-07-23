@@ -442,9 +442,9 @@ with ui.div():
 
 with ui.div(class_="srag-main"):
     with ui.div(class_="srag-header"):
-        ui.h2("Monitor de Saúde SRAG", class_="srag-page-title")
+        ui.h2("Agente Chatbot - Monitor de Saúde SRAG", class_="srag-page-title")
         ui.p(
-            "Peça análises ou um relatório executivo no chatbot — informe a UF ou Brasil.",
+            "Peça análises ou um relatório executivo no chatbot — informe uma UF (ex.: SP, RJ) ou Brasil.",
             class_="srag-page-subtitle",
         )
 
