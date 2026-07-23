@@ -9,4 +9,4 @@ env/
 .vscode/
 data/
 raw_data/
-scripts/generate_architecture_pdf.py
+
