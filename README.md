@@ -4,7 +4,6 @@ Solução para monitoramento de **SRAG** (Síndrome Respiratória Aguda Grave) c
 
 ![Figura — chatbot_agent_monitor](docs/chatbot_agent_monitor.png)
 
-**Exemplo de parte de um relatório:**
 ![Figura — relatorio](docs/relatorio.png)
 
 ## Visão geral
