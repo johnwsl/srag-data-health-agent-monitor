@@ -211,6 +211,7 @@ A suíte cobre download, ETL, métricas, rotas, Tavily, OpenAI, orquestrador Lan
 
 | Documento | Conteúdo |
 |-----------|----------|
+| [`docs/Resumo_Arquitetura_Solucao.md`](docs/Resumo_Arquitetura_Solucao.md) | Resumo do README, arquitetura e funcionamento do orquestrador |
 | [`docs/arquitetura_solucao_srag.md`](docs/arquitetura_solucao_srag.md) | Arquitetura conceitual (frontend, API, LangGraph, tools, LLM, DuckDB, Tavily, auditoria) |
 | [`docs/etl_pipeline.md`](docs/etl_pipeline.md) | Download, ETL, configuração e exemplos |
 | [`docs/metricas_srag.md`](docs/metricas_srag.md) | Cálculo das métricas, escopo UF/Brasil, endpoints |

@@ -24,7 +24,7 @@ def _sample_payload() -> ChatReportPayload:
             ChartSpec(
                 id="casos_diarios",
                 type="line",
-                title="Casos diários de SRAG — SP",
+                title="Casos diários de SRAG (últimos 30 dias) — SP",
                 x=ChartAxisSpec(field="data", label="Data"),
                 y=ChartAxisSpec(field="casos", label="Notificações"),
                 data=[
@@ -38,7 +38,7 @@ def _sample_payload() -> ChatReportPayload:
             ChartSpec(
                 id="casos_mensais",
                 type="bar",
-                title="Casos mensais — SP",
+                title="Casos mensais de SRAG (últimos 12 meses) — SP",
                 x=ChartAxisSpec(field="label", label="Mês"),
                 y=ChartAxisSpec(field="casos", label="Notificações"),
                 data=[
