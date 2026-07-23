@@ -113,12 +113,12 @@ curl http://localhost:8000/metrics/SP/casos-mensais
 
 ### Dashboard Shiny
 
-As métricas e séries temporais podem ser visualizadas no dashboard interativo em `shiny_app/dashboard.py` ([Shiny for Python](https://shiny.posit.co/py/)):
+As métricas alimentam o orquestrador e o relatório no dashboard (`shiny_app/dashboard.py`):
 
-- **Docker:** [http://localhost:8080](http://localhost:8080) (serviço `dashboard`)
+- **Docker:** [http://localhost:8080](http://localhost:8080)
 - **Local:** `shiny run shiny_app/dashboard.py --host 127.0.0.1 --port 8080`
 
-O dashboard consome a API (`API_BASE_URL`) e exibe cards de métricas, permite gerar relatório executivo por IA e conversar com o chatbot (gráficos via ChartSpec no relatório/chat).
+O dashboard consome a API (`API_BASE_URL`). Escopo (UF/`BRASIL`) e período analisado são informados pelo **chatbot**; o relatório e os gráficos oficiais (`ChartSpec` → Plotly) aparecem na seção **Relatório gerado por IA**.
 
 ---
 
@@ -679,6 +679,6 @@ pytest tests/unit/test_srag_metrics.py tests/unit/test_metrics_routes.py tests/i
 
 ---
 
-## Integração com o agente de IA
+## Integração com o orquestrador de IA
 
-O serviço `SragMetricsApiLangChainService` consolida as quatro métricas e as duas séries temporais em uma única chamada (`get_full_metrics_data`), exposta como tool LangChain `consultar_metricas_srag`. Detalhes em [`agente_orquestrador.md`](agente_orquestrador.md).
+O serviço `SragMetricsApiLangChainService` consolida as quatro métricas e as duas séries em `get_full_metrics_data`, exposto como tools LangChain (`consultar_metricas_srag`, `consultar_serie_temporal`) no `LangGraphOrchestratorAgent`. O orquestrador informa escopo e período nas respostas do chat. Detalhes em [`agente_orquestrador.md`](agente_orquestrador.md).

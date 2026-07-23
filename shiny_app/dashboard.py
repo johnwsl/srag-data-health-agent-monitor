@@ -613,7 +613,7 @@ with ui.div(class_="srag-main"):
         with ui.div(class_="srag-report-charts"):
             with ui.layout_columns(col_widths=(6, 6)):
                 with ui.card(full_screen=True):
-                    ui.card_header("Gráfico do relatório — casos diários")
+                    ui.card_header("Gráfico do relatório — casos diários (últimos 30 dias)")
 
                     @render_plotly
                     def report_chart_casos_diarios():
@@ -623,7 +623,7 @@ with ui.div(class_="srag-main"):
                         )
 
                 with ui.card(full_screen=True):
-                    ui.card_header("Gráfico do relatório — casos mensais")
+                    ui.card_header("Gráfico do relatório — casos mensais (últimos 12 meses)")
 
                     @render_plotly
                     def report_chart_casos_mensais():

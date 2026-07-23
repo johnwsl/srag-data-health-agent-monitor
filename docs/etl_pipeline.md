@@ -143,7 +143,8 @@ O método `EtlService.get_status()` verifica:
 }
 ```
 
-O agente de IA e o dashboard utilizam esse endpoint para decidir se precisam executar o pipeline automaticamente.
+O agente de IA e o dashboard utilizam `GET /datasets/status` para decidir se precisam executar o pipeline automaticamente (`ensure_pipeline_ready` no orquestrador).
+
 
 ---
 
@@ -454,7 +455,7 @@ curl http://localhost:8000/metrics/RJ
 
 ### Dashboard
 
-Com a API em execução, o dashboard Shiny está disponível em **[http://localhost:8080](http://localhost:8080)** (serviço `dashboard` no Docker ou `shiny run shiny_app/dashboard.py` localmente). No dashboard é possível selecionar UF ou `BRASIL`, visualizar métricas e gráficos e gerar o relatório executivo pelo botão **Gerar Relatório por IA**.
+Com a API em execução, o dashboard Shiny está em **[http://localhost:8080](http://localhost:8080)** (serviço `dashboard` no Docker ou `shiny run shiny_app/dashboard.py` localmente). Use o **chatbot** para consultar métricas/tendências ou pedir um relatório executivo (informe UF ou Brasil). O texto completo e os gráficos aparecem na seção **Relatório gerado por IA**.
 
 ---
 
@@ -490,6 +491,7 @@ srag-data-health-agent-monitor/
 │   └── INFLUD26-20-07-2026.csv    ← download (atualização 2026)
 └── data/
     └── srag.duckdb                ← ETL (tabela srag_notificacoes)
+                                   ← auditoria do agente (tabela agent_audit_log)
                                    ← consultado por GET /metrics/{estado}
 ```
 
@@ -499,8 +501,9 @@ srag-data-health-agent-monitor/
 
 Com os dados no DuckDB e as métricas expostas pela API, a aplicação oferece:
 
-- **Dashboard Shiny** em [http://localhost:8080](http://localhost:8080) para visualização interativa
-- **Agente de IA** via `POST /agents/report` para resumos executivos de até 4000 caracteres (ver [`agente_orquestrador.md`](agente_orquestrador.md))
-- **Séries temporais** para gráficos de casos diários e mensais
+- **Dashboard Shiny** em [http://localhost:8080](http://localhost:8080) — chatbot + relatório por IA
+- **Orquestrador LangGraph** via `POST /agents/chat` (fluxo principal) e `POST /agents/report` (one-shot); ver [`agente_orquestrador.md`](agente_orquestrador.md)
+- **Auditoria** em `agent_audit_log` (`GET /agents/audit`)
+- **Séries temporais** consumidas como `ChartSpec` / Plotly no relatório
 
-O pipeline e as métricas formam a **base de dados e indicadores** sobre os quais o dashboard e o agente operam.
+O pipeline e as métricas formam a **base de dados e indicadores** sobre os quais o dashboard e o orquestrador operam.
