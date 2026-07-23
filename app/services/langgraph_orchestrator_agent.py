@@ -1,4 +1,5 @@
 import json
+import time
 import uuid
 from typing import Any
 
@@ -8,7 +9,7 @@ from langgraph.prebuilt import create_react_agent
 from pydantic import BaseModel, Field
 
 from app.config import SRAG_BRASIL_CODE, SRAG_STATE_CODES
-from app.models.chart import ChartSpec
+from app.services.agent_audit_service import AgentAuditService
 from app.services.agent_tools import build_srag_agent_tools
 from app.services.chart_spec_service import ChartSpecService
 from app.services.openai_langchain_service import OpenAILangChainService
@@ -55,6 +56,7 @@ class LangGraphOrchestratorAgent:
         metrics_service: SragMetricsApiLangChainService | None = None,
         news_service: TavilyNewsLangChainService | None = None,
         chart_spec_service: ChartSpecService | None = None,
+        audit_service: AgentAuditService | None = None,
         checkpointer=None,
         graph=None,
         max_chars: int = 4000,
@@ -63,6 +65,7 @@ class LangGraphOrchestratorAgent:
         self.metrics_service = metrics_service or SragMetricsApiLangChainService()
         self.news_service = news_service or TavilyNewsLangChainService()
         self.chart_spec_service = chart_spec_service or ChartSpecService()
+        self.audit_service = audit_service if audit_service is not None else AgentAuditService()
         self._checkpointer = checkpointer
         self._graph = graph
         self.max_chars = max_chars
@@ -221,6 +224,48 @@ class LangGraphOrchestratorAgent:
                 ordered.append(name)
         return ordered
 
+    @staticmethod
+    def _extract_tool_events(messages: list[Any]) -> list[dict[str, Any]]:
+        """Extrai nome/args/resultado das tools apenas do turno atual."""
+        pending: dict[str, dict[str, Any]] = {}
+        events: list[dict[str, Any]] = []
+
+        for message in LangGraphOrchestratorAgent._messages_for_current_turn(messages):
+            tool_calls = getattr(message, "tool_calls", None) or []
+            for tool_call in tool_calls:
+                if isinstance(tool_call, dict):
+                    call_id = str(tool_call.get("id") or "")
+                    name = str(tool_call.get("name") or "unknown")
+                    args = tool_call.get("args") or {}
+                else:
+                    call_id = str(getattr(tool_call, "id", "") or "")
+                    name = str(getattr(tool_call, "name", None) or "unknown")
+                    args = getattr(tool_call, "args", {}) or {}
+
+                payload = {"name": name, "args": args, "result": None}
+                if call_id:
+                    pending[call_id] = payload
+                else:
+                    events.append(payload)
+
+            if getattr(message, "type", None) == "tool":
+                call_id = str(getattr(message, "tool_call_id", "") or "")
+                result_text = LangGraphOrchestratorAgent._extract_text(
+                    getattr(message, "content", "")
+                )
+                base = pending.pop(call_id, None) if call_id else None
+                events.append(
+                    {
+                        "name": (base or {}).get("name")
+                        or str(getattr(message, "name", None) or "unknown"),
+                        "args": (base or {}).get("args") or {},
+                        "result": result_text,
+                    }
+                )
+
+        events.extend(pending.values())
+        return events
+
     def _limit_text(self, text: str) -> str:
         compact = text.strip()
         if len(compact) <= self.max_chars:
@@ -242,6 +287,12 @@ class LangGraphOrchestratorAgent:
                 reply = self._extract_text(getattr(message_item, "content", ""))
         return reply.strip() or "Nao foi possivel gerar uma resposta nesta rodada."
 
+    def _record_audit(self, **kwargs: Any) -> str | None:
+        try:
+            return self.audit_service.record(**kwargs)
+        except Exception:  # noqa: BLE001
+            return None
+
     def _invoke(
         self,
         *,
@@ -259,10 +310,12 @@ class LangGraphOrchestratorAgent:
             f"{human_content}"
         )
 
+        started = time.perf_counter()
         result = self._get_graph().invoke(
             {"messages": [{"role": "user", "content": content}]},
             config={"configurable": {"thread_id": thread_id}},
         )
+        duration_ms = (time.perf_counter() - started) * 1000
         messages = list(result.get("messages") or [])
 
         return {
@@ -271,6 +324,9 @@ class LangGraphOrchestratorAgent:
             "reply": self._extract_reply(messages),
             "charts": list(self.chart_spec_service.generated_charts),
             "tools_used": self._extract_tools_used(messages),
+            "tool_events": self._extract_tool_events(messages),
+            "duration_ms": duration_ms,
+            "user_message": human_content,
         }
 
     def chat(
@@ -288,21 +344,98 @@ class LangGraphOrchestratorAgent:
         thread_id = (session_id or "").strip() or self._new_session_id()
         self.last_report = None
 
-        result = self._invoke(human_content=texto, thread_id=thread_id, estado=estado)
-        report = self.last_report
-        if report is not None:
-            result["estado_contexto"] = report["estado"]
-            # Graficos do relatorio ficam apenas em result["report"], nao no chat.
-            result["charts"] = []
+        try:
+            result = self._invoke(human_content=texto, thread_id=thread_id, estado=estado)
+            report = self.last_report
+            if report is not None:
+                result["estado_contexto"] = report["estado"]
+                # Graficos do relatorio ficam apenas em result["report"], nao no chat.
+                result["charts"] = []
 
-        result["report"] = report
-        return result
+            result["report"] = report
+            charts_count = len((report or {}).get("charts") or result.get("charts") or [])
+            audit_id = self._record_audit(
+                kind="chat",
+                session_id=result["session_id"],
+                estado_contexto=result["estado_contexto"],
+                user_message=texto,
+                reply=result["reply"],
+                tools_used=result.get("tools_used") or [],
+                tool_events=result.get("tool_events") or [],
+                report_generated=report is not None,
+                charts_count=charts_count,
+                duration_ms=float(result.get("duration_ms") or 0.0),
+                status="ok",
+            )
+            result["audit_id"] = audit_id
+            return result
+        except Exception as error:
+            self._record_audit(
+                kind="chat",
+                session_id=thread_id,
+                estado_contexto=estado,
+                user_message=texto,
+                reply="",
+                tools_used=[],
+                tool_events=[],
+                report_generated=False,
+                charts_count=0,
+                duration_ms=0.0,
+                status="error",
+                error_message=str(error),
+            )
+            raise
 
     def generate_executive_summary(self, estado: str) -> dict[str, Any]:
-        composed = self._compose_executive_report(estado)
-        return {
-            "resumo_executivo": composed["resumo_executivo"],
-            "charts": composed["charts"],
-            "tools_used": ["gerar_relatorio_executivo"],
-            "session_id": f"report-{composed['estado']}-{self._new_session_id()}",
-        }
+        started = time.perf_counter()
+        scope = self._normalize_estado(estado)
+        session_id = f"report-{scope}-{self._new_session_id()}"
+        user_message = f"Gerar relatorio executivo para {scope}"
+
+        try:
+            composed = self._compose_executive_report(scope)
+            duration_ms = (time.perf_counter() - started) * 1000
+            tools_used = ["gerar_relatorio_executivo"]
+            tool_events = [
+                {
+                    "name": "gerar_relatorio_executivo",
+                    "args": {"estado": scope},
+                    "result": f"resumo_chars={len(composed['resumo_executivo'])}; charts={len(composed['charts'])}",
+                }
+            ]
+            audit_id = self._record_audit(
+                kind="report",
+                session_id=session_id,
+                estado_contexto=composed["estado"],
+                user_message=user_message,
+                reply=composed["resumo_executivo"],
+                tools_used=tools_used,
+                tool_events=tool_events,
+                report_generated=True,
+                charts_count=len(composed["charts"]),
+                duration_ms=duration_ms,
+                status="ok",
+            )
+            return {
+                "resumo_executivo": composed["resumo_executivo"],
+                "charts": composed["charts"],
+                "tools_used": tools_used,
+                "session_id": session_id,
+                "audit_id": audit_id,
+            }
+        except Exception as error:
+            self._record_audit(
+                kind="report",
+                session_id=session_id,
+                estado_contexto=scope,
+                user_message=user_message,
+                reply="",
+                tools_used=[],
+                tool_events=[],
+                report_generated=False,
+                charts_count=0,
+                duration_ms=(time.perf_counter() - started) * 1000,
+                status="error",
+                error_message=str(error),
+            )
+            raise

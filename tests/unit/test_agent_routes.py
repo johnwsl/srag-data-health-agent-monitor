@@ -31,6 +31,7 @@ def mock_orchestrator() -> MagicMock:
             )
         ],
         "tools_used": ["consultar_metricas_srag", "buscar_noticias_srag"],
+        "audit_id": "audit-report-1",
     }
     agent.chat.return_value = {
         "session_id": "sess-123",
@@ -49,13 +50,20 @@ def mock_orchestrator() -> MagicMock:
         ],
         "tools_used": ["consultar_metricas_srag", "gerar_especificacao_grafico"],
         "report": None,
+        "audit_id": "audit-chat-1",
     }
     return agent
 
 
 @pytest.fixture
-def client(mock_orchestrator):
-    agent_routes.controller = AgentController(orchestrator=mock_orchestrator)
+def client(mock_orchestrator, tmp_path):
+    from app.services.agent_audit_service import AgentAuditService
+
+    audit = AgentAuditService(duckdb_path=tmp_path / "audit.duckdb", enabled=True)
+    agent_routes.controller = AgentController(
+        orchestrator=mock_orchestrator,
+        audit_service=audit,
+    )
     with TestClient(app) as test_client:
         yield test_client
     agent_routes.controller = AgentController()
@@ -70,6 +78,7 @@ def test_generate_report_returns_summary(client, mock_orchestrator):
     assert "Dados oficiais" in payload["resumo_executivo"]
     assert len(payload["charts"]) == 1
     assert payload["charts"][0]["id"] == "casos_diarios"
+    assert payload["audit_id"] == "audit-report-1"
     mock_orchestrator.generate_executive_summary.assert_called_once_with("SP")
 
 
@@ -109,11 +118,59 @@ def test_chat_returns_reply_and_charts(client, mock_orchestrator):
     assert payload["tools_used"] == ["consultar_metricas_srag", "gerar_especificacao_grafico"]
     assert payload["charts"][0]["id"] == "casos_mensais"
     assert payload["report"] is None
+    assert payload["audit_id"] == "audit-chat-1"
     mock_orchestrator.chat.assert_called_once_with(
         "Mostre a tendencia mensal",
         session_id="sess-123",
         estado_contexto="sp",
     )
+
+
+def test_list_audit_events(client, tmp_path):
+    from app.services.agent_audit_service import AgentAuditService
+
+    audit = AgentAuditService(duckdb_path=tmp_path / "audit-routes.duckdb", enabled=True)
+    audit.record(
+        kind="chat",
+        session_id="sess-audit",
+        estado_contexto="BRASIL",
+        user_message="Oi",
+        reply="Ola",
+        tools_used=["consultar_metricas_srag"],
+        tool_events=[{"name": "consultar_metricas_srag", "args": {"estado": "BRASIL"}, "result": "{}"}],
+        duration_ms=5.0,
+    )
+    agent_routes.controller = AgentController(
+        orchestrator=MagicMock(spec=LangGraphOrchestratorAgent),
+        audit_service=audit,
+    )
+
+    response = client.get("/agents/audit?limit=10")
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["total"] == 1
+    assert payload["items"][0]["session_id"] == "sess-audit"
+
+    by_session = client.get("/agents/audit/session/sess-audit")
+    assert by_session.status_code == 200
+    assert by_session.json()["total"] == 1
+
+    audit_id = payload["items"][0]["audit_id"]
+    by_id = client.get(f"/agents/audit/{audit_id}")
+    assert by_id.status_code == 200
+    assert by_id.json()["audit_id"] == audit_id
+
+
+def test_get_audit_event_returns_404(client, tmp_path):
+    from app.services.agent_audit_service import AgentAuditService
+
+    audit = AgentAuditService(duckdb_path=tmp_path / "audit-404.duckdb", enabled=True)
+    agent_routes.controller = AgentController(
+        orchestrator=MagicMock(spec=LangGraphOrchestratorAgent),
+        audit_service=audit,
+    )
+    response = client.get("/agents/audit/nao-existe")
+    assert response.status_code == 404
 
 
 def test_chat_returns_report_payload_for_dashboard_section(client, mock_orchestrator):

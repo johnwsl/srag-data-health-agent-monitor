@@ -307,6 +307,48 @@ No Docker, o serviço `dashboard` usa `API_BASE_URL=http://api:8000` para comuni
 
 ---
 
+## Auditoria / governança (Fase 4)
+
+Cada execução de `chat` e `report` grava um evento na tabela DuckDB `agent_audit_log` (mesmo arquivo de `DUCKDB_PATH`, tabela separada de `srag_notificacoes`).
+
+### O que é registrado
+
+| Campo | Conteúdo |
+|-------|----------|
+| `audit_id` | UUID do evento |
+| `created_at` | Timestamp UTC |
+| `kind` | `chat` ou `report` |
+| `session_id` | Thread da conversa / id sintético do relatório |
+| `estado_contexto` | UF ou BRASIL |
+| `user_message` / `reply` | Entrada e saída textual (truncadas) |
+| `tools_used` | Nomes das tools do **turno atual** |
+| `tool_events` | Nome, args e preview do resultado de cada tool |
+| `report_generated` | Se um relatório foi gerado na rodada |
+| `charts_count` | Quantidade de ChartSpecs |
+| `duration_ms` | Latência da execução |
+| `status` / `error_message` | `ok` ou `error` |
+
+Falhas ao gravar auditoria **não** interrompem o agente (apenas warning no log).
+
+### Endpoints
+
+```bash
+# Lista recente
+curl "http://localhost:8000/agents/audit?limit=20"
+
+# Por sessão
+curl "http://localhost:8000/agents/audit/session/{session_id}"
+
+# Por evento
+curl "http://localhost:8000/agents/audit/{audit_id}"
+```
+
+Variáveis: `AGENT_AUDIT_TABLE_NAME` (default `agent_audit_log`), `AGENT_AUDIT_ENABLED` (default `true`).
+
+As respostas de `POST /agents/chat` e `POST /agents/report` incluem `audit_id` quando a gravação sucede.
+
+---
+
 ## Integração com o dashboard
 
 O dashboard em **[http://localhost:8080](http://localhost:8080)** (`shiny_app/dashboard.py`) possui:
@@ -331,8 +373,9 @@ Os testes do agente e dos serviços relacionados estão em:
 | Arquivo | Cobertura |
 |---------|-----------|
 | `tests/unit/test_srag_report_agent.py` | Orquestração do agente, charts e limite de 4000 caracteres |
-| `tests/unit/test_srag_chat_agent.py` | Chatbot LangGraph (sessão, reply, charts, tools) |
-| `tests/unit/test_agent_routes.py` | Endpoints `/agents/report` e `/agents/chat` |
+| `tests/unit/test_srag_chat_agent.py` | Chatbot LangGraph (sessão, reply, charts, tools, auditoria) |
+| `tests/unit/test_agent_routes.py` | Endpoints `/agents/report`, `/agents/chat` e `/agents/audit` |
+| `tests/unit/test_agent_audit_service.py` | Persistência e consulta da trilha de auditoria no DuckDB |
 | `tests/unit/test_chart_spec_service.py` | Montagem de ChartSpec a partir das séries oficiais |
 | `tests/unit/test_srag_metrics_api_service.py` | Cliente HTTP, tool LangChain e `ensure_pipeline_ready` |
 | `tests/unit/test_openai_langchain_service.py` | Integração com OpenAI via LangChain |

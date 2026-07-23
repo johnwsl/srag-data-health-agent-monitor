@@ -47,6 +47,10 @@ O **dashboard em `http://localhost:8080` é a principal interface de uso do proj
 | `GET` | `/metrics/{estado}/casos-diarios` | Retorna a série diária dos últimos 30 dias |
 | `GET` | `/metrics/{estado}/casos-mensais` | Retorna a série mensal dos últimos 12 meses |
 | `POST` | `/agents/report` | Gera resumo executivo com dados oficiais e notícias |
+| `POST` | `/agents/chat` | Chatbot LangGraph (métricas, notícias, relatório) |
+| `GET` | `/agents/audit` | Lista eventos de auditoria do orquestrador |
+| `GET` | `/agents/audit/session/{session_id}` | Trilha de auditoria de uma sessão |
+| `GET` | `/agents/audit/{audit_id}` | Detalhe de um evento de auditoria |
 | `POST` | `/agents/chat` | Chatbot multi-turno (LangGraph) com charts e memória por sessão |
 
 Documentação interativa (Swagger): [http://localhost:8000/docs](http://localhost:8000/docs)

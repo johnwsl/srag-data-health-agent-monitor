@@ -2,6 +2,7 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 from app.models.chart import ChartAxisSpec, ChartSpec
+from app.services.agent_audit_service import AgentAuditService
 from app.services.chart_spec_service import ChartSpecService
 from app.services.srag_chat_agent import SragChatAgent
 from app.services.langgraph_orchestrator_agent import LangGraphOrchestratorAgent
@@ -66,6 +67,7 @@ def test_chat_agent_invokes_langgraph_and_returns_charts():
         news_service=MagicMock(),
         chart_spec_service=chart_service,
         graph=fake_graph,
+        audit_service=AgentAuditService(enabled=False),
     )
     agent = SragChatAgent(orchestrator=orchestrator)
 
@@ -119,6 +121,7 @@ def test_tools_used_only_counts_current_turn():
         news_service=MagicMock(),
         chart_spec_service=ChartSpecService(),
         graph=fake_graph,
+        audit_service=AgentAuditService(enabled=False),
     )
 
     result = orchestrator.chat("Qual a mortalidade?", session_id="sess-turn")
@@ -126,6 +129,46 @@ def test_tools_used_only_counts_current_turn():
     assert result["tools_used"] == ["consultar_metricas_srag"]
     assert result["report"] is None
     assert "mortalidade" in result["reply"].lower()
+
+
+def test_chat_records_audit_when_enabled(tmp_path):
+    fake_graph = MagicMock()
+    fake_graph.invoke.return_value = {
+        "messages": [
+            SimpleNamespace(
+                type="ai",
+                content="",
+                tool_calls=[{"name": "consultar_metricas_srag", "args": {"estado": "SP"}, "id": "1"}],
+            ),
+            SimpleNamespace(
+                type="tool",
+                content='{"ok": true}',
+                tool_calls=[],
+                tool_call_id="1",
+                name="consultar_metricas_srag",
+            ),
+            SimpleNamespace(type="ai", content="Resposta auditada.", tool_calls=[]),
+        ]
+    }
+    audit = AgentAuditService(duckdb_path=tmp_path / "chat-audit.duckdb", enabled=True)
+    orchestrator = LangGraphOrchestratorAgent(
+        llm_service=MagicMock(),
+        metrics_service=FakeMetricsService(),
+        news_service=MagicMock(),
+        chart_spec_service=ChartSpecService(),
+        graph=fake_graph,
+        audit_service=audit,
+    )
+
+    result = orchestrator.chat("Como esta SP?", session_id="sess-audit-1", estado_contexto="SP")
+
+    assert result["audit_id"]
+    events = audit.get_by_session("sess-audit-1")
+    assert len(events) == 1
+    assert events[0]["kind"] == "chat"
+    assert events[0]["tools_used"] == ["consultar_metricas_srag"]
+    assert events[0]["tool_events"][0]["args"]["estado"] == "SP"
+    assert events[0]["status"] == "ok"
 
 
 def test_chat_agent_rejects_empty_message():
@@ -136,6 +179,7 @@ def test_chat_agent_rejects_empty_message():
             news_service=MagicMock(),
             chart_spec_service=ChartSpecService(),
             graph=MagicMock(),
+            audit_service=AgentAuditService(enabled=False),
         )
     )
 
@@ -158,6 +202,7 @@ def test_chat_agent_creates_session_id_when_missing():
             news_service=MagicMock(),
             chart_spec_service=ChartSpecService(),
             graph=fake_graph,
+            audit_service=AgentAuditService(enabled=False),
         )
     )
 
@@ -211,6 +256,7 @@ def test_chat_with_report_tool_exposes_report_not_in_chat_charts():
         news_service=news,
         chart_spec_service=chart_service,
         graph=fake_graph,
+        audit_service=AgentAuditService(enabled=False),
     )
     # Simula o efeito da tool no grafo: o checkpointer real chamaria a tool;
     # aqui definimos last_report como a tool faria.
@@ -259,6 +305,7 @@ def test_same_orchestrator_serves_report_and_chat():
         news_service=news,
         chart_spec_service=ChartSpecService(),
         graph=fake_graph,
+        audit_service=AgentAuditService(enabled=False),
     )
 
     report = orchestrator.generate_executive_summary("SP")

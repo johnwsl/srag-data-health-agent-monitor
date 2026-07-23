@@ -1,18 +1,36 @@
-from fastapi import HTTPException, status
+from fastapi import HTTPException, Query, status
 
 from app.models.agent import ExecutiveSummaryRequest, ExecutiveSummaryResponse
+from app.models.audit import (
+    AgentAuditListResponse,
+    AgentAuditRecord,
+    AgentAuditSessionResponse,
+)
 from app.models.chat import ChatReportPayload, ChatRequest, ChatResponse
+from app.services.agent_audit_service import AgentAuditService
 from app.services.langgraph_orchestrator_agent import LangGraphOrchestratorAgent
 
 
 class AgentController:
-    def __init__(self, orchestrator: LangGraphOrchestratorAgent | None = None):
+    def __init__(
+        self,
+        orchestrator: LangGraphOrchestratorAgent | None = None,
+        audit_service: AgentAuditService | None = None,
+    ):
         self.orchestrator = orchestrator
+        self.audit_service = audit_service
 
     def _get_orchestrator(self) -> LangGraphOrchestratorAgent:
         if self.orchestrator is None:
-            self.orchestrator = LangGraphOrchestratorAgent()
+            self.orchestrator = LangGraphOrchestratorAgent(
+                audit_service=self._get_audit_service(),
+            )
         return self.orchestrator
+
+    def _get_audit_service(self) -> AgentAuditService:
+        if self.audit_service is None:
+            self.audit_service = AgentAuditService()
+        return self.audit_service
 
     def generate_report(self, payload: ExecutiveSummaryRequest) -> ExecutiveSummaryResponse:
         estado = payload.estado.strip().upper()
@@ -34,6 +52,7 @@ class AgentController:
             estado=estado,
             resumo_executivo=result["resumo_executivo"],
             charts=result.get("charts") or [],
+            audit_id=result.get("audit_id"),
         )
 
     def chat(self, payload: ChatRequest) -> ChatResponse:
@@ -69,4 +88,53 @@ class AgentController:
             charts=result.get("charts") or [],
             tools_used=result.get("tools_used") or [],
             report=report_payload,
+            audit_id=result.get("audit_id"),
         )
+
+    def list_audit(
+        self,
+        *,
+        limit: int = 50,
+        offset: int = 0,
+        kind: str | None = None,
+        session_id: str | None = None,
+    ) -> AgentAuditListResponse:
+        items = self._get_audit_service().list_events(
+            limit=limit,
+            offset=offset,
+            kind=kind,
+            session_id=session_id,
+        )
+        return AgentAuditListResponse(
+            total=len(items),
+            items=[AgentAuditRecord(**item) for item in items],
+        )
+
+    def get_audit_session(self, session_id: str) -> AgentAuditSessionResponse:
+        session = (session_id or "").strip()
+        if not session:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail="session_id e obrigatorio.",
+            )
+        items = self._get_audit_service().get_by_session(session)
+        return AgentAuditSessionResponse(
+            session_id=session,
+            total=len(items),
+            items=[AgentAuditRecord(**item) for item in items],
+        )
+
+    def get_audit_event(self, audit_id: str) -> AgentAuditRecord:
+        event_id = (audit_id or "").strip()
+        if not event_id:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail="audit_id e obrigatorio.",
+            )
+        item = self._get_audit_service().get_by_id(event_id)
+        if item is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Evento de auditoria nao encontrado: {event_id}",
+            )
+        return AgentAuditRecord(**item)

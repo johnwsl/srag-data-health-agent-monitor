@@ -14,3 +14,7 @@ class ExecutiveSummaryResponse(BaseModel):
         default_factory=list,
         description="Especificações de gráficos oficiais associados ao relatório.",
     )
+    audit_id: str | None = Field(
+        default=None,
+        description="Identificador do evento de auditoria desta geracao, se gravado.",
+    )

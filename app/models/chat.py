@@ -42,3 +42,7 @@ class ChatResponse(BaseModel):
         default=None,
         description="Relatorio executivo gerado para a secao Relatorio gerado por IA, se solicitado.",
     )
+    audit_id: str | None = Field(
+        default=None,
+        description="Identificador do evento de auditoria desta rodada, se gravado.",
+    )

@@ -1,5 +1,6 @@
 from unittest.mock import MagicMock
 
+from app.services.agent_audit_service import AgentAuditService
 from app.services.chart_spec_service import ChartSpecService
 from app.services.langgraph_orchestrator_agent import LangGraphOrchestratorAgent
 from app.services.srag_report_agent import SragReportAgent
@@ -57,6 +58,7 @@ def test_generate_executive_summary_composes_report_with_llm():
         news_service=news,
         chart_spec_service=ChartSpecService(),
         graph=MagicMock(),
+        audit_service=AgentAuditService(enabled=False),
     )
     agent = SragReportAgent(orchestrator=orchestrator)
 
@@ -82,6 +84,7 @@ def test_generate_executive_summary_limits_output_to_4000_chars():
         news_service=news,
         chart_spec_service=ChartSpecService(),
         graph=MagicMock(),
+        audit_service=AgentAuditService(enabled=False),
     )
 
     response = SragReportAgent(orchestrator=orchestrator).generate_executive_summary("BRASIL")
@@ -103,6 +106,7 @@ def test_generate_executive_summary_includes_charts_from_metrics():
         news_service=news,
         chart_spec_service=ChartSpecService(),
         graph=MagicMock(),
+        audit_service=AgentAuditService(enabled=False),
     )
 
     response = SragReportAgent(orchestrator=orchestrator).generate_executive_summary("SP")
@@ -119,6 +123,7 @@ def test_generate_executive_summary_rejects_invalid_uf():
         news_service=MagicMock(),
         chart_spec_service=ChartSpecService(),
         graph=MagicMock(),
+        audit_service=AgentAuditService(enabled=False),
     )
 
     try:
