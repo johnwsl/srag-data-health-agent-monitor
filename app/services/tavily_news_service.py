@@ -1,6 +1,8 @@
 import os
 from collections.abc import Sequence
 
+from langchain_core.tools import StructuredTool
+from langchain_tavily import TavilySearch
 from pydantic import BaseModel
 
 TAVILY_SEARCH_QUERY = "SRAG sindrome respiratoria aguda grave Brasil noticias"
@@ -49,13 +51,6 @@ class TavilyNewsLangChainService:
         self._tool = tavily_search_tool or self._build_tool()
 
     def _build_tool(self):
-        try:
-            from langchain_tavily import TavilySearch
-        except ImportError as exc:
-            raise ImportError(
-                "Dependencia ausente. Instale 'langchain-tavily' para usar TavilyNewsLangChainService."
-            ) from exc
-
         return TavilySearch(
             api_key=self.api_key,
             max_results=self.max_results,
@@ -122,13 +117,6 @@ class TavilyNewsLangChainService:
         return f"{compact[: max_length - 3].rstrip()}..."
 
     def as_tool(self):
-        try:
-            from langchain_core.tools import StructuredTool
-        except ImportError as exc:
-            raise ImportError(
-                "Dependencia ausente. Instale 'langchain-core' para usar TavilyNewsLangChainService.as_tool()."
-            ) from exc
-
         return StructuredTool.from_function(
             func=self.buscar_noticias,
             name="buscar_noticias_srag",

@@ -2,6 +2,9 @@ import os
 from collections.abc import Sequence
 from typing import Any
 
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
+from langchain_openai import ChatOpenAI
+
 
 class OpenAILangChainService:
     """Encapsula interacoes com um chat model da OpenAI via LangChain."""
@@ -28,13 +31,6 @@ class OpenAILangChainService:
         return self._client
 
     def _build_client(self):
-        try:
-            from langchain_openai import ChatOpenAI
-        except ImportError as exc:
-            raise ImportError(
-                "Dependencia ausente. Instale 'langchain-openai' para usar OpenAILangChainService."
-            ) from exc
-
         return ChatOpenAI(
             api_key=self.api_key,
             model=self.model,
@@ -66,13 +62,6 @@ class OpenAILangChainService:
         max_iterations: int = 8,
     ) -> str:
         """Executa um loop de tool calling ate a LLM responder sem novas tools."""
-        try:
-            from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
-        except ImportError as exc:
-            raise ImportError(
-                "Dependencia ausente. Instale 'langchain-core' para usar run_with_tools()."
-            ) from exc
-
         if not tools:
             return self.ask(user_prompt, system_prompt=system_prompt)
 

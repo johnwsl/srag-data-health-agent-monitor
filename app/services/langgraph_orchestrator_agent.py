@@ -2,6 +2,9 @@ import json
 import uuid
 from typing import Any
 
+from langchain_core.tools import StructuredTool
+from langgraph.checkpoint.memory import MemorySaver
+from langgraph.prebuilt import create_react_agent
 from pydantic import BaseModel, Field
 
 from app.config import SRAG_BRASIL_CODE, SRAG_STATE_CODES
@@ -63,12 +66,6 @@ class LangGraphOrchestratorAgent:
 
     def _get_checkpointer(self):
         if self._checkpointer is None:
-            try:
-                from langgraph.checkpoint.memory import MemorySaver
-            except ImportError as exc:
-                raise ImportError(
-                    "Dependencia ausente. Instale 'langgraph' para usar LangGraphOrchestratorAgent."
-                ) from exc
             self._checkpointer = MemorySaver()
         return self._checkpointer
 
@@ -110,13 +107,6 @@ class LangGraphOrchestratorAgent:
         }
 
     def _report_tool(self):
-        try:
-            from langchain_core.tools import StructuredTool
-        except ImportError as exc:
-            raise ImportError(
-                "Dependencia ausente. Instale 'langchain-core' para usar gerar_relatorio_executivo."
-            ) from exc
-
         def gerar_relatorio_executivo(estado: str) -> str:
             try:
                 composed = self._compose_executive_report(estado)
@@ -149,13 +139,6 @@ class LangGraphOrchestratorAgent:
         )
 
     def _build_graph(self):
-        try:
-            from langgraph.prebuilt import create_react_agent
-        except ImportError as exc:
-            raise ImportError(
-                "Dependencia ausente. Instale 'langgraph' para usar LangGraphOrchestratorAgent."
-            ) from exc
-
         tools = [
             *build_srag_agent_tools(
                 self.metrics_service,

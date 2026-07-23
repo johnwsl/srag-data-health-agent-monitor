@@ -1,5 +1,6 @@
 from typing import Any, Literal
 
+from langchain_core.tools import StructuredTool
 from pydantic import BaseModel, Field
 
 from app.models.chart import REPORT_NOTIFICATION_DELAY_CAVEAT, ChartAxisSpec, ChartSpec
@@ -87,13 +88,6 @@ class ChartSpecService:
         return chart
 
     def as_tool(self, metrics_service):
-        try:
-            from langchain_core.tools import StructuredTool
-        except ImportError as exc:
-            raise ImportError(
-                "Dependencia ausente. Instale 'langchain-core' para usar ChartSpecService.as_tool()."
-            ) from exc
-
         def gerar_especificacao_grafico(estado: str, serie: Literal["diaria", "mensal"]) -> str:
             scope = estado.strip().upper()
             try:

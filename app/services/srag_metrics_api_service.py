@@ -3,6 +3,7 @@ import os
 from typing import Any, Literal
 
 import httpx
+from langchain_core.tools import StructuredTool
 from pydantic import BaseModel, Field
 
 
@@ -146,13 +147,6 @@ class SragMetricsApiLangChainService:
         return json.dumps({"serie": serie, **payload}, ensure_ascii=False, default=str)
 
     def as_tool(self):
-        try:
-            from langchain_core.tools import StructuredTool
-        except ImportError as exc:
-            raise ImportError(
-                "Dependencia ausente. Instale 'langchain' para usar SragMetricsApiLangChainService.as_tool()."
-            ) from exc
-
         return StructuredTool.from_function(
             func=self.consultar_metricas,
             name="consultar_metricas_srag",
@@ -166,14 +160,6 @@ class SragMetricsApiLangChainService:
         )
 
     def as_series_tool(self):
-        try:
-            from langchain_core.tools import StructuredTool
-        except ImportError as exc:
-            raise ImportError(
-                "Dependencia ausente. Instale 'langchain' para usar "
-                "SragMetricsApiLangChainService.as_series_tool()."
-            ) from exc
-
         return StructuredTool.from_function(
             func=self.consultar_serie,
             name="consultar_serie_temporal",
