@@ -1,14 +1,24 @@
 import json
 import os
-from typing import Any
+from typing import Any, Literal
 
 import httpx
+from langchain_core.tools import StructuredTool
 from pydantic import BaseModel, Field
 
 
 class SragMetricsToolInput(BaseModel):
     estado: str = Field(
         description="Sigla da UF (ex.: SP, RJ) ou BRASIL para consultar metricas nacionais."
+    )
+
+
+class SragSeriesToolInput(BaseModel):
+    estado: str = Field(
+        description="Sigla da UF (ex.: SP, RJ) ou BRASIL para consultar a serie temporal."
+    )
+    serie: Literal["diaria", "mensal"] = Field(
+        description="Tipo de serie: 'diaria' (ultimos 30 dias) ou 'mensal' (ultimos 12 meses)."
     )
 
 
@@ -120,14 +130,23 @@ class SragMetricsApiLangChainService:
 
         return json.dumps(payload, ensure_ascii=False, default=str)
 
-    def as_tool(self):
+    def consultar_serie(self, estado: str, serie: Literal["diaria", "mensal"]) -> str:
         try:
-            from langchain_core.tools import StructuredTool
-        except ImportError as exc:
-            raise ImportError(
-                "Dependencia ausente. Instale 'langchain' para usar SragMetricsApiLangChainService.as_tool()."
-            ) from exc
+            estado = self._normalize_estado(estado)
+            if serie == "diaria":
+                payload = self.get_daily_cases(estado)
+            elif serie == "mensal":
+                payload = self.get_monthly_cases(estado)
+            else:
+                return "Serie invalida. Use 'diaria' ou 'mensal'."
+        except ValueError as error:
+            return f"Erro ao consultar serie SRAG: {error}"
+        except httpx.HTTPError as error:
+            return f"Erro de comunicacao com a API SRAG: {error}"
 
+        return json.dumps({"serie": serie, **payload}, ensure_ascii=False, default=str)
+
+    def as_tool(self):
         return StructuredTool.from_function(
             func=self.consultar_metricas,
             name="consultar_metricas_srag",
@@ -138,4 +157,15 @@ class SragMetricsApiLangChainService:
                 "dos ultimos 12 meses para uma UF (estado do brasil - sg_uf_not) ou para BRASIL."
             ),
             args_schema=SragMetricsToolInput,
+        )
+
+    def as_series_tool(self):
+        return StructuredTool.from_function(
+            func=self.consultar_serie,
+            name="consultar_serie_temporal",
+            description=(
+                "Consulta uma serie temporal oficial de SRAG: 'diaria' (ultimos 30 dias) "
+                "ou 'mensal' (ultimos 12 meses) para uma UF ou BRASIL."
+            ),
+            args_schema=SragSeriesToolInput,
         )

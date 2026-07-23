@@ -19,6 +19,13 @@ RAW_DATA_DIR = _raw_data_dir if _raw_data_dir.is_absolute() else BASE_DIR / _raw
 _duckdb_path = Path(os.environ["DUCKDB_PATH"])
 DUCKDB_PATH = _duckdb_path if _duckdb_path.is_absolute() else BASE_DIR / _duckdb_path
 ETL_TABLE_NAME = os.environ["ETL_TABLE_NAME"]
+AGENT_AUDIT_TABLE_NAME = os.environ.get("AGENT_AUDIT_TABLE_NAME", "agent_audit_log")
+AGENT_AUDIT_ENABLED = os.environ.get("AGENT_AUDIT_ENABLED", "true").strip().lower() in {
+    "1",
+    "true",
+    "yes",
+    "on",
+}
 
 ETL_COLUMNS = [
     "NU_NOTIFIC",

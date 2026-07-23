@@ -24,6 +24,7 @@ O sistema entrega quatro blocos principais:
 5. **Métricas** — Calcula taxa de aumento de casos, mortalidade, ocupação de UTI e vacinação COVID para cada UF ou para o Brasil (`BRASIL`).
 6. **Dashboard** — Interface web em [Shiny for Python](https://shiny.posit.co/py/) disponível em **[http://localhost:8080](http://localhost:8080)** para visualizar as métricas de forma interativa.
 7. **Agente de IA** — Gera resumo executivo com métricas oficiais, tendências e notícias recentes sobre SRAG.
+8. **Chatbot / relatório LangGraph** — Orquestrador unico com tools dinâmicas, Tavily e gráficos oficiais (`ChartSpec`).
 
 ## Acesso rápido
 
@@ -46,6 +47,11 @@ O **dashboard em `http://localhost:8080` é a principal interface de uso do proj
 | `GET` | `/metrics/{estado}/casos-diarios` | Retorna a série diária dos últimos 30 dias |
 | `GET` | `/metrics/{estado}/casos-mensais` | Retorna a série mensal dos últimos 12 meses |
 | `POST` | `/agents/report` | Gera resumo executivo com dados oficiais e notícias |
+| `POST` | `/agents/chat` | Chatbot LangGraph (métricas, notícias, relatório) |
+| `GET` | `/agents/audit` | Lista eventos de auditoria do orquestrador |
+| `GET` | `/agents/audit/session/{session_id}` | Trilha de auditoria de uma sessão |
+| `GET` | `/agents/audit/{audit_id}` | Detalhe de um evento de auditoria |
+| `POST` | `/agents/chat` | Chatbot multi-turno (LangGraph) com charts e memória por sessão |
 
 Documentação interativa (Swagger): [http://localhost:8000/docs](http://localhost:8000/docs)
 

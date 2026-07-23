@@ -8,7 +8,7 @@ O agente orquestrador gera um **resumo executivo** sobre a situação de SRAG pa
 - **notícias recentes** buscadas via Tavily Search
 - **síntese textual** produzida por um modelo da OpenAI via LangChain
 
-O resultado é exposto pela API em `POST /agents/report` e também pode ser consumido no dashboard em **[http://localhost:8080](http://localhost:8080)**.
+O resultado é exposto pela API em `POST /agents/report` e, no dashboard (**[http://localhost:8080](http://localhost:8080)**), é gerado pelo **chatbot** via tool `gerar_relatorio_executivo`. O texto completo do relatório **não** aparece no chat — só na seção **Relatório gerado por IA** (`ChatResponse.report`).
 
 ---
 
@@ -18,43 +18,47 @@ O fluxo segue o padrão MVC já adotado no projeto:
 
 | Camada | Arquivo | Responsabilidade |
 |--------|---------|------------------|
-| Rota | `app/views/agent_routes.py` | Expõe `POST /agents/report` |
+| Rota | `app/views/agent_routes.py` | Expõe `POST /agents/report` e `POST /agents/chat` |
 | Controller | `app/controllers/agent_controller.py` | Valida entrada e trata erros HTTP |
-| Agente | `app/services/srag_report_agent.py` | Orquestra pipeline, tools e chamada à LLM |
-| Modelos | `app/models/agent.py` | `ExecutiveSummaryRequest` e `ExecutiveSummaryResponse` |
+| Orquestrador | `app/services/langgraph_orchestrator_agent.py` | Orquestrador unico LangGraph (relatorio + chat + Tavily) |
+| Facades | `srag_report_agent.py`, `srag_chat_agent.py` | Atalhos de compatibilidade do mesmo orquestrador |
+| Modelos | `app/models/agent.py`, `app/models/chat.py` | Request/response de relatorio e chat |
+| ChartSpec | `app/models/chart.py` + `app/services/chart_spec_service.py` | Contrato e montagem dos gráficos oficiais |
 
 ### Services envolvidos
 
 | Classe | Arquivo | Responsabilidade |
 |--------|---------|------------------|
-| `OpenAILangChainService` | `app/services/openai_langchain_service.py` | Conecta à OpenAI via LangChain (`ChatOpenAI`) |
-| `SragMetricsApiLangChainService` | `app/services/srag_metrics_api_service.py` | Cliente HTTP da API SRAG com exposição como tool LangChain |
-| `TavilyNewsLangChainService` | `app/services/tavily_news_service.py` | Busca notícias recentes sobre SRAG no Brasil |
-| `SragReportAgent` | `app/services/srag_report_agent.py` | Coordena tudo e gera o resumo executivo final |
+| `LangGraphOrchestratorAgent` | `app/services/langgraph_orchestrator_agent.py` | Orquestrador unico (`create_react_agent` + MemorySaver) |
+| `OpenAILangChainService` | `app/services/openai_langchain_service.py` | Chat model OpenAI via LangChain (`ChatOpenAI`) |
+| `SragMetricsApiLangChainService` | `app/services/srag_metrics_api_service.py` | Cliente HTTP da API SRAG como tools |
+| `ChartSpecService` | `app/services/chart_spec_service.py` | Monta ChartSpec / tool `gerar_especificacao_grafico` |
+| `TavilyNewsLangChainService` | `app/services/tavily_news_service.py` | Tool `buscar_noticias_srag` (Tavily) |
 
 ---
 
 ## Fluxo de execução
 
-Quando `POST /agents/report` é chamado com um payload como:
+### Relatório direto (`POST /agents/report`)
 
-```json
-{
-  "estado": "SP"
-}
-```
+Quando `POST /agents/report` é chamado com `{"estado": "SP"}`:
 
-o agente executa a seguinte sequência:
+1. `ensure_pipeline_ready()` (status + pipeline se necessário)
+2. carrega métricas oficiais + notícias (Tavily)
+3. monta ChartSpec a partir das séries
+4. LLM sintetiza o resumo (até **4000** caracteres)
+5. retorna `resumo_executivo` + `charts`
 
-1. chama `GET /datasets/status` via `ensure_pipeline_ready()`
-2. se os dados não estiverem prontos, chama `POST /datasets/pipeline` automaticamente
-3. invoca a tool `consultar_metricas_srag`, que consulta internamente:
-   - `GET /metrics/{estado}`
-   - `GET /metrics/{estado}/casos-diarios`
-   - `GET /metrics/{estado}/casos-mensais`
-4. invoca a tool `buscar_noticias_srag` com Tavily Search
-5. envia o contexto consolidado (status, dados oficiais e notícias) para a OpenAI
-6. retorna um resumo executivo com até **4000 caracteres**
+### Relatório via chatbot (`POST /agents/chat`)
+
+No dashboard não há filtro de UF nem botão “Gerar Relatório por IA”. O usuário pede o relatório no chat (ex.: “Gere o relatório de SP”). O orquestrador LangGraph:
+
+1. identifica UF ou `BRASIL` na mensagem
+2. chama a tool `gerar_relatorio_executivo`
+3. responde no chat só com confirmação breve
+4. devolve o texto completo em `report` para a seção **Relatório gerado por IA**
+
+Tools do chat: `consultar_metricas_srag`, `consultar_serie_temporal`, `gerar_especificacao_grafico`, `buscar_noticias_srag`, `gerar_relatorio_executivo`. Memória por `session_id`.
 
 ---
 
@@ -68,25 +72,24 @@ flowchart TD
     D --> E[GET /datasets/status]
     E --> F{Dados prontos?}
     F -- não --> G[POST /datasets/pipeline]
-    F -- sim --> H[Tool consultar_metricas_srag]
+    F -- sim --> H[Loop tool calling LLM]
     G --> H
-    H --> I[GET /metrics/estado]
-    H --> J[GET /metrics/estado/casos-diarios]
-    H --> K[GET /metrics/estado/casos-mensais]
-    C --> L[Tool buscar_noticias_srag]
-    L --> M[Tavily Search]
-    I --> N[OpenAI via LangChain]
-    J --> N
-    K --> N
-    M --> N
-    N --> O[Resumo executivo]
+    H --> I[consultar_metricas_srag]
+    H --> J[consultar_serie_temporal]
+    H --> K[gerar_especificacao_grafico]
+    H --> L[buscar_noticias_srag]
+    I --> M[API /metrics]
+    J --> M
+    K --> N[ChartSpec]
+    L --> O[Tavily Search]
+    H --> P[Resumo executivo + charts]
 ```
 
 ---
 
 ## Tools LangChain
 
-O agente utiliza duas tools estruturadas (`StructuredTool` do LangChain):
+O agente utiliza tools estruturadas (`StructuredTool` do LangChain). A LLM escolhe dinamicamente quais chamar.
 
 ### `consultar_metricas_srag`
 
@@ -114,6 +117,26 @@ O método `get_full_metrics_data()` agrega as três chamadas à API em um único
 }
 ```
 
+### `consultar_serie_temporal`
+
+Definida em `SragMetricsApiLangChainService.as_series_tool()`.
+
+| Propriedade | Valor |
+|-------------|-------|
+| Nome | `consultar_serie_temporal` |
+| Entrada | `estado`, `serie` (`diaria` ou `mensal`) |
+| Saída | JSON da série temporal oficial |
+
+### `gerar_especificacao_grafico`
+
+Definida em `ChartSpecService.as_tool(metrics_service)`.
+
+| Propriedade | Valor |
+|-------------|-------|
+| Nome | `gerar_especificacao_grafico` |
+| Entrada | `estado`, `serie` (`diaria` ou `mensal`) |
+| Saída | JSON `ChartSpec` para renderização no dashboard |
+
 ### `buscar_noticias_srag`
 
 Definida em `TavilyNewsLangChainService.as_tool()`.
@@ -121,7 +144,7 @@ Definida em `TavilyNewsLangChainService.as_tool()`.
 | Propriedade | Valor |
 |-------------|-------|
 | Nome | `buscar_noticias_srag` |
-| Entrada | `query` (padrão: consulta sobre SRAG no Brasil) |
+| Entrada | vazia (consulta fixa otimizada) |
 | Saída | Texto com manchetes, resumos e URLs |
 
 Configuração da busca Tavily:
@@ -194,16 +217,75 @@ curl -X POST http://localhost:8000/agents/report \
 ```json
 {
   "estado": "SP",
-  "resumo_executivo": "Resumo executivo em português..."
+  "resumo_executivo": "Resumo executivo em português...",
+  "charts": [
+    {
+      "id": "casos_diarios",
+      "type": "line",
+      "title": "Casos diários de SRAG — SP",
+      "x": {"field": "data", "label": "Data"},
+      "y": {"field": "casos", "label": "Notificações"},
+      "data": [{"data": "2026-06-01", "casos": 12}],
+      "source": "GET /metrics/SP/casos-diarios",
+      "caveat": "Períodos recentes podem estar incompletos por atraso de digitação/notificação; ..."
+    },
+    {
+      "id": "casos_mensais",
+      "type": "bar",
+      "title": "Casos mensais de SRAG — SP",
+      "x": {"field": "label", "label": "Mês"},
+      "y": {"field": "casos", "label": "Notificações"},
+      "data": [{"label": "05/2026", "casos": 100}],
+      "source": "GET /metrics/SP/casos-mensais",
+      "caveat": "Períodos recentes podem estar incompletos por atraso de digitação/notificação; ..."
+    }
+  ]
 }
 ```
 
+Os gráficos (`ChartSpec`) são montados por `ChartSpecService` a partir das séries oficiais da API. O prompt do agente orienta a não interpretar queda recente como redução real sem considerar atraso de notificação.
 ### Códigos de erro
 
 | Código | Situação |
 |--------|----------|
 | `422` | UF inválida ou erro de validação |
 | `502` | Falha na geração do resumo (OpenAI, Tavily, pipeline, etc.) |
+
+---
+
+## Chatbot LangGraph (`POST /agents/chat`)
+
+O chatbot multi-turno usa o **mesmo** `LangGraphOrchestratorAgent` do relatório (`create_react_agent` + `MemorySaver` + tools, incluindo Tavily).
+
+### Requisição
+
+```bash
+curl -X POST http://localhost:8000/agents/chat \
+  -H "Content-Type: application/json" \
+  -d "{\"message\":\"Mostre a tendencia mensal\",\"estado_contexto\":\"SP\",\"session_id\":\"sess-123\"}"
+```
+
+### Resposta (`ChatResponse`)
+
+```json
+{
+  "session_id": "sess-123",
+  "estado_contexto": "SP",
+  "reply": "Resposta do assistente...",
+  "charts": [],
+  "tools_used": ["consultar_metricas_srag", "gerar_especificacao_grafico"]
+}
+```
+
+| Campo | Descrição |
+|-------|-----------|
+| `session_id` | Memória da conversa (thread do LangGraph). Se omitido na request, a API cria um novo |
+| `estado_contexto` | UF/`BRASIL` usado como contexto padrão das tools |
+| `reply` | Texto da resposta |
+| `charts` | ChartSpecs gerados nesta rodada |
+| `tools_used` | Tools invocadas nesta rodada |
+
+Arquivos principais: `app/services/srag_chat_agent.py`, `app/models/chat.py`.
 
 ---
 
@@ -225,6 +307,48 @@ No Docker, o serviço `dashboard` usa `API_BASE_URL=http://api:8000` para comuni
 
 ---
 
+## Auditoria / governança (Fase 4)
+
+Cada execução de `chat` e `report` grava um evento na tabela DuckDB `agent_audit_log` (mesmo arquivo de `DUCKDB_PATH`, tabela separada de `srag_notificacoes`).
+
+### O que é registrado
+
+| Campo | Conteúdo |
+|-------|----------|
+| `audit_id` | UUID do evento |
+| `created_at` | Timestamp UTC |
+| `kind` | `chat` ou `report` |
+| `session_id` | Thread da conversa / id sintético do relatório |
+| `estado_contexto` | UF ou BRASIL |
+| `user_message` / `reply` | Entrada e saída textual (truncadas) |
+| `tools_used` | Nomes das tools do **turno atual** |
+| `tool_events` | Nome, args e preview do resultado de cada tool |
+| `report_generated` | Se um relatório foi gerado na rodada |
+| `charts_count` | Quantidade de ChartSpecs |
+| `duration_ms` | Latência da execução |
+| `status` / `error_message` | `ok` ou `error` |
+
+Falhas ao gravar auditoria **não** interrompem o agente (apenas warning no log).
+
+### Endpoints
+
+```bash
+# Lista recente
+curl "http://localhost:8000/agents/audit?limit=20"
+
+# Por sessão
+curl "http://localhost:8000/agents/audit/session/{session_id}"
+
+# Por evento
+curl "http://localhost:8000/agents/audit/{audit_id}"
+```
+
+Variáveis: `AGENT_AUDIT_TABLE_NAME` (default `agent_audit_log`), `AGENT_AUDIT_ENABLED` (default `true`).
+
+As respostas de `POST /agents/chat` e `POST /agents/report` incluem `audit_id` quando a gravação sucede.
+
+---
+
 ## Integração com o dashboard
 
 O dashboard em **[http://localhost:8080](http://localhost:8080)** (`shiny_app/dashboard.py`) possui:
@@ -232,9 +356,11 @@ O dashboard em **[http://localhost:8080](http://localhost:8080)** (`shiny_app/da
 - filtro de estado (UF ou `BRASIL`)
 - verificação automática do status do pipeline
 - cards com as quatro métricas principais
-- gráficos de casos diários e mensais (Plotly)
 - botão **Gerar Relatório por IA**
 - card textual para exibir o resumo do agente
+- gráficos do relatório (diário e mensal) renderizados via Plotly a partir de `charts`
+- **Chatbot SRAG (LangGraph)** com histórico, tools e gráficos da conversa
+- botão **Nova conversa do chat**
 
 Assim, o frontend apresenta métricas, gráficos e análise executiva em uma única interface.
 
@@ -246,8 +372,11 @@ Os testes do agente e dos serviços relacionados estão em:
 
 | Arquivo | Cobertura |
 |---------|-----------|
-| `tests/unit/test_srag_report_agent.py` | Orquestração do agente e limite de 4000 caracteres |
-| `tests/unit/test_agent_routes.py` | Endpoint `/agents/report` (sucesso, 422, 502) |
+| `tests/unit/test_srag_report_agent.py` | Orquestração do agente, charts e limite de 4000 caracteres |
+| `tests/unit/test_srag_chat_agent.py` | Chatbot LangGraph (sessão, reply, charts, tools, auditoria) |
+| `tests/unit/test_agent_routes.py` | Endpoints `/agents/report`, `/agents/chat` e `/agents/audit` |
+| `tests/unit/test_agent_audit_service.py` | Persistência e consulta da trilha de auditoria no DuckDB |
+| `tests/unit/test_chart_spec_service.py` | Montagem de ChartSpec a partir das séries oficiais |
 | `tests/unit/test_srag_metrics_api_service.py` | Cliente HTTP, tool LangChain e `ensure_pipeline_ready` |
 | `tests/unit/test_openai_langchain_service.py` | Integração com OpenAI via LangChain |
 | `tests/unit/test_tavily_news_service.py` | Busca de notícias, filtros e tool LangChain |

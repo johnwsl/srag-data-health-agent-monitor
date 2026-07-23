@@ -118,7 +118,7 @@ As métricas e séries temporais podem ser visualizadas no dashboard interativo 
 - **Docker:** [http://localhost:8080](http://localhost:8080) (serviço `dashboard`)
 - **Local:** `shiny run shiny_app/dashboard.py --host 127.0.0.1 --port 8080`
 
-O dashboard consome a API (`API_BASE_URL`) e exibe cards de métricas, gráficos de casos diários e mensais (Plotly) e permite gerar relatório executivo por IA.
+O dashboard consome a API (`API_BASE_URL`) e exibe cards de métricas, permite gerar relatório executivo por IA e conversar com o chatbot (gráficos via ChartSpec no relatório/chat).
 
 ---
 

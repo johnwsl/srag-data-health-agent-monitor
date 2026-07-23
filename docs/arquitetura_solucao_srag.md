@@ -49,7 +49,7 @@ flowchart LR
 
 O frontend é o dashboard em **Shiny for Python**, disponível em `http://localhost:8080`.
 
-Ele permite selecionar uma UF ou `BRASIL`, visualizar cards de métricas, acompanhar gráficos de casos diários e mensais com Plotly e solicitar o relatório executivo por IA pelo botão **Gerar Relatório por IA**.
+Ele permite selecionar uma UF ou `BRASIL`, visualizar cards de métricas, solicitar o relatório executivo por IA e conversar com o chatbot (gráficos oficiais via ChartSpec no relatório/chat).
 
 ### Backend
 
@@ -94,18 +94,20 @@ O agente não consulta o DuckDB diretamente. Ele usa a API do próprio projeto c
 
 ## Tools Utilizadas
 
+O `SragReportAgent` usa **tool calling dinâmico**: a LLM escolhe quais tools chamar e em qual ordem via `OpenAILangChainService.run_with_tools`.
+
 ### `consultar_metricas_srag`
 
 Tool estruturada do LangChain definida por `SragMetricsApiLangChainService`.
 
 Responsabilidades:
 
-- verificar se a pipeline está pronta com `GET /datasets/status`;
-- executar `POST /datasets/pipeline` se os dados ainda não estiverem prontos;
 - consultar `GET /metrics/{estado}`;
 - consultar `GET /metrics/{estado}/casos-diarios`;
 - consultar `GET /metrics/{estado}/casos-mensais`;
 - devolver um JSON consolidado com métricas e séries temporais.
+
+A preparação da pipeline (`GET /datasets/status` e, se necessário, `POST /datasets/pipeline`) ocorre no agente antes do loop de tools.
 
 As quatro métricas principais retornadas são:
 
@@ -113,6 +115,14 @@ As quatro métricas principais retornadas são:
 - taxa de mortalidade;
 - taxa de ocupação de UTI;
 - taxa de vacinação COVID na população analisada.
+
+### `consultar_serie_temporal`
+
+Consulta isolada de série `diaria` ou `mensal` para uma UF ou `BRASIL`.
+
+### `gerar_especificacao_grafico`
+
+Monta um `ChartSpec` oficial (linha diária ou barras mensais) a partir dos dados da API, para renderização no dashboard.
 
 ### `buscar_noticias_srag`
 
@@ -128,15 +138,14 @@ Responsabilidades:
 
 ## Interação com a LLM
 
-A interação com a LLM é encapsulada pelo `OpenAILangChainService`, que usa `ChatOpenAI` via LangChain.
+A interação com a LLM é encapsulada pelo `OpenAILangChainService`, que usa `ChatOpenAI` via LangChain e um loop de tool calling (`bind_tools`).
 
-O `SragReportAgent` monta um prompt com:
+O `SragReportAgent` instrui a LLM a:
 
-- estado consultado;
-- status da pipeline SRAG;
-- dados oficiais retornados pela tool `consultar_metricas_srag`;
-- notícias retornadas pela tool `buscar_noticias_srag`;
-- instruções para separar claramente **Dados oficiais** e **Notícias**.
+- decidir dinamicamente quais tools usar;
+- separar claramente **Dados oficiais** e **Notícias**;
+- evitar interpretar queda recente como redução real sem considerar atraso de notificação;
+- referenciar os gráficos oficiais quando gerados.
 
 A LLM retorna um resumo executivo em português, objetivo, limitado a até 4000 caracteres.
 

@@ -9,8 +9,8 @@ from app.services.srag_metrics_api_service import SragMetricsApiLangChainService
 from app.services.tavily_news_service import TavilyNewsLangChainService
 
 
-class SragReportAgent:
-    """Gera resumo executivo via orquestrador unico LangGraph."""
+class SragChatAgent:
+    """Chatbot via orquestrador unico LangGraph."""
 
     def __init__(
         self,
@@ -19,19 +19,29 @@ class SragReportAgent:
         news_service: TavilyNewsLangChainService | None = None,
         chart_spec_service: ChartSpecService | None = None,
         orchestrator: LangGraphOrchestratorAgent | None = None,
-        max_chars: int = 4000,
-        max_tool_iterations: int = 8,
-        **kwargs: Any,
+        checkpointer=None,
+        graph=None,
     ) -> None:
-        del max_tool_iterations  # legado do loop bind_tools; ignorado no LangGraph
         self.orchestrator = orchestrator or LangGraphOrchestratorAgent(
             llm_service=llm_service,
             metrics_service=metrics_service,
             news_service=news_service,
             chart_spec_service=chart_spec_service,
-            max_chars=max_chars,
-            **{k: v for k, v in kwargs.items() if k in {"checkpointer", "graph"}},
+            checkpointer=checkpointer,
+            graph=graph,
         )
+        # Exposto para testes que inspecionam metrics_service no agente.
+        self.metrics_service = self.orchestrator.metrics_service
 
-    def generate_executive_summary(self, estado: str) -> dict[str, Any]:
-        return self.orchestrator.generate_executive_summary(estado)
+    def chat(
+        self,
+        message: str,
+        *,
+        session_id: str | None = None,
+        estado_contexto: str = "BRASIL",
+    ) -> dict[str, Any]:
+        return self.orchestrator.chat(
+            message,
+            session_id=session_id,
+            estado_contexto=estado_contexto,
+        )
