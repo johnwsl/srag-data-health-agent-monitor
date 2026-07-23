@@ -6,6 +6,12 @@ Diagrama e componentes da solução **SRAG Data Health Agent Monitor**: frontend
 
 A solução combina dados oficiais de SRAG (OpenDataSUS), DuckDB, API FastAPI, dashboard Shiny e um orquestrador LangGraph com chatbot, relatório executivo, gráficos oficiais (`ChartSpec`) e trilha de auditoria.
 
+O fluxo principal é o **chatbot**: o usuário conversa; o `LangGraphOrchestratorAgent` **toma decisões** (ReAct) sobre quais tools chamar e se gera relatório ou só responde no chat.
+
+![Fluxo chatbot ↔ orquestrador](fluxo_chatbot_orquestrador.png)
+
+*Figura — Fluxo do chatbot com `LangGraphOrchestratorAgent` (ReAct + tools + auditoria).*
+
 ```mermaid
 flowchart LR
     Usuario[Usuário / Analista] --> Frontend[Frontend<br/>Dashboard Shiny<br/>localhost:8080]
