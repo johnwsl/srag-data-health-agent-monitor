@@ -104,3 +104,48 @@ def test_as_tool_invokes_news_search():
 
     assert tool.name == "buscar_noticias_srag"
     assert "Brasil monitora aumento de casos de SRAG" in response
+
+
+def test_listar_noticias_returns_structured_items():
+    fake_tool = FakeTavilySearch(
+        {
+            "results": [
+                {
+                    "title": "Brasil monitora aumento de casos de SRAG",
+                    "url": "https://g1.globo.com/saude/noticia-srag-brasil",
+                    "content": "Autoridades de saude acompanham novos casos de sindrome respiratoria aguda grave no Brasil.",
+                },
+                {
+                    "title": "Politica e celebridade comentam surto",
+                    "url": "https://site.com.br/noticia",
+                    "content": "Materia mistura politica com celebridade e SRAG.",
+                },
+            ]
+        }
+    )
+
+    service = TavilyNewsLangChainService(tavily_search_tool=fake_tool)
+    items = service.listar_noticias()
+
+    assert fake_tool.calls == [{"query": TAVILY_SEARCH_QUERY}]
+    assert len(items) == 1
+    assert items[0]["title"] == "Brasil monitora aumento de casos de SRAG"
+    assert items[0]["url"] == "https://g1.globo.com/saude/noticia-srag-brasil"
+    assert "sindrome respiratoria" in items[0]["snippet"].lower()
+
+
+def test_listar_noticias_returns_empty_when_nothing_relevant():
+    fake_tool = FakeTavilySearch(
+        {
+            "results": [
+                {
+                    "title": "Noticia internacional sem contexto",
+                    "url": "https://example.com/news",
+                    "content": "Tema geral sem relacao com sindromes respiratorias.",
+                }
+            ]
+        }
+    )
+
+    service = TavilyNewsLangChainService(tavily_search_tool=fake_tool)
+    assert service.listar_noticias() == []

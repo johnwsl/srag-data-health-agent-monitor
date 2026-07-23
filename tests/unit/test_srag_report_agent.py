@@ -138,6 +138,64 @@ def test_generate_executive_summary_limits_output_to_5000_chars():
     assert len(response["charts"]) == 2
 
 
+def test_generate_executive_summary_empty_news_section():
+    llm = MagicMock()
+    llm.ask.return_value = "Narrativa sem listar noticias."
+    news = MagicMock()
+    news.listar_noticias.return_value = []
+    metrics_service = FakeMetricsService(SAMPLE_METRICS_PAYLOAD)
+    orchestrator = LangGraphOrchestratorAgent(
+        llm_service=llm,
+        metrics_service=metrics_service,
+        news_service=news,
+        chart_spec_service=ChartSpecService(),
+        graph=MagicMock(),
+        audit_service=AgentAuditService(enabled=False),
+    )
+
+    response = SragReportAgent(orchestrator=orchestrator).generate_executive_summary("SP")
+
+    resumo = response["resumo_executivo"]
+    assert "## Notícias encontradas" in resumo
+    assert "Nenhuma notícia relevante sobre SRAG no Brasil foi encontrada." in resumo
+    news.buscar_noticias.assert_not_called()
+
+
+def test_generate_executive_summary_falls_back_to_buscar_noticias_text():
+    class NewsOnlyBuscar:
+        def __init__(self) -> None:
+            self.buscar_calls = 0
+
+        def buscar_noticias(self) -> str:
+            self.buscar_calls += 1
+            return (
+                "Noticias recentes sobre SRAG no Brasil:\n"
+                "1. Boletim SRAG no Brasil\n"
+                "   Resumo: Queda de casos hospitalares.\n"
+                "   URL: https://www.gov.br/saude/boletim\n"
+            )
+
+    llm = MagicMock()
+    llm.ask.return_value = "Narrativa com fallback de noticias."
+    news = NewsOnlyBuscar()
+    metrics_service = FakeMetricsService(SAMPLE_METRICS_PAYLOAD)
+    orchestrator = LangGraphOrchestratorAgent(
+        llm_service=llm,
+        metrics_service=metrics_service,
+        news_service=news,
+        chart_spec_service=ChartSpecService(),
+        graph=MagicMock(),
+        audit_service=AgentAuditService(enabled=False),
+    )
+
+    response = SragReportAgent(orchestrator=orchestrator).generate_executive_summary("SP")
+
+    assert news.buscar_calls == 1
+    resumo = response["resumo_executivo"]
+    assert "[Boletim SRAG no Brasil](https://www.gov.br/saude/boletim)" in resumo
+    assert "https://www.gov.br/saude/boletim" in resumo
+
+
 def test_generate_executive_summary_includes_charts_from_metrics():
     llm = MagicMock()
     llm.ask.return_value = "Resumo sem chamada explicita de grafico."

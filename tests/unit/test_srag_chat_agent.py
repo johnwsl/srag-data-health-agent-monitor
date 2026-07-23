@@ -234,11 +234,42 @@ def test_chat_with_report_tool_exposes_report_not_in_chat_charts():
     llm = MagicMock()
     llm.ask.return_value = "Resumo executivo SP.\nDados oficiais: ok.\nNoticias: ok."
     news = MagicMock()
+    news.listar_noticias.return_value = []
     news.buscar_noticias.return_value = "Sem noticias criticas."
     metrics = FakeMetricsService()
     metrics.get_full_metrics_data = MagicMock(
         return_value={
             "sg_uf_not": "SP",
+            "metricas": {
+                "taxa_aumento_casos": {
+                    "mes_atual_ano": 2026,
+                    "mes_atual_mes": 6,
+                    "mes_anterior_ano": 2026,
+                    "mes_anterior_mes": 5,
+                    "casos_mes_atual": 100,
+                    "casos_mes_anterior": 80,
+                    "taxa_aumento_percentual": 25.0,
+                },
+                "taxa_mortalidade": {
+                    "mes_atual_ano": 2026,
+                    "mes_atual_mes": 6,
+                    "mes_anterior_ano": 2026,
+                    "mes_anterior_mes": 5,
+                    "total_casos_2_meses": 180,
+                    "total_obitos_2_meses": 9,
+                    "taxa_mortalidade_percentual": 5.0,
+                },
+                "taxa_ocupacao_uti": {
+                    "total_casos_2_meses": 180,
+                    "casos_com_uti_2_meses": 36,
+                    "taxa_ocupacao_uti_percentual": 20.0,
+                },
+                "taxa_vacinacao_populacao": {
+                    "total_casos_2_meses": 180,
+                    "casos_vacinados_2_meses": 90,
+                    "taxa_vacinacao_percentual": 50.0,
+                },
+            },
             "casos_diarios": {
                 "sg_uf_not": "SP",
                 "pontos": [{"data": "2026-06-01", "total_casos": 2}],
@@ -262,7 +293,13 @@ def test_chat_with_report_tool_exposes_report_not_in_chat_charts():
     # aqui definimos last_report como a tool faria.
     sample_report = {
         "estado": "SP",
-        "resumo_executivo": "Resumo executivo SP.",
+        "resumo_executivo": (
+            "Resumo executivo SP.\n\n"
+            "## Quatro métricas principais\n\n"
+            "| Métrica | Valor | Detalhe |\n"
+            "| --- | --- | --- |\n"
+            "| Taxa de aumento de casos | 25,00% | 100 / 80 |\n"
+        ),
         "charts": chart_service.from_metrics_payload(metrics.get_full_metrics_data("SP")),
     }
 
@@ -277,6 +314,7 @@ def test_chat_with_report_tool_exposes_report_not_in_chat_charts():
     assert result["report"] is not None
     assert result["report"]["estado"] == "SP"
     assert "Resumo" in result["report"]["resumo_executivo"]
+    assert "## Quatro métricas principais" in result["report"]["resumo_executivo"]
     assert result["charts"] == []
     assert result["estado_contexto"] == "SP"
     assert "Relatorio gerado" in result["reply"]
@@ -290,11 +328,13 @@ def test_same_orchestrator_serves_report_and_chat():
     llm = MagicMock()
     llm.ask.return_value = "Resumo curto."
     news = MagicMock()
+    news.listar_noticias.return_value = []
     news.buscar_noticias.return_value = "Noticias."
     metrics = FakeMetricsService()
     metrics.get_full_metrics_data = MagicMock(
         return_value={
             "sg_uf_not": "SP",
+            "metricas": {},
             "casos_diarios": {"pontos": []},
             "casos_mensais": {"pontos": []},
         }
@@ -316,3 +356,4 @@ def test_same_orchestrator_serves_report_and_chat():
     assert chat["report"] is None
     assert fake_graph.invoke.call_count == 1
     llm.ask.assert_called_once()
+    news.listar_noticias.assert_called_once()

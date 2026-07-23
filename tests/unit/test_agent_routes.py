@@ -87,7 +87,16 @@ def test_export_report_pdf_returns_pdf_bytes(client):
         "/agents/report/pdf",
         json={
             "estado": "SP",
-            "resumo_executivo": "Escopo SP. Dados oficiais e noticias.",
+            "resumo_executivo": (
+                "Escopo SP.\n\n"
+                "## Quatro métricas principais\n\n"
+                "| Métrica | Valor | Detalhe |\n"
+                "| --- | --- | --- |\n"
+                "| Taxa de mortalidade | 5,00% | 9 óbitos / 180 casos |\n\n"
+                "## Notícias encontradas\n\n"
+                "1. [SRAG no Brasil](https://www.gov.br/saude/srag)\n"
+                "   Link: https://www.gov.br/saude/srag\n"
+            ),
             "charts": [
                 {
                     "id": "casos_diarios",
@@ -110,6 +119,7 @@ def test_export_report_pdf_returns_pdf_bytes(client):
     assert response.headers["content-type"].startswith("application/pdf")
     assert "relatorio_srag_SP.pdf" in response.headers.get("content-disposition", "")
     assert response.content.startswith(b"%PDF")
+    assert len(response.content) > 500
 
 
 def test_export_report_pdf_requires_resumo(client):
