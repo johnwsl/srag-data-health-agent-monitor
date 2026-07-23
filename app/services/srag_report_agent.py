@@ -19,7 +19,7 @@ class SragReportAgent:
         news_service: TavilyNewsLangChainService | None = None,
         chart_spec_service: ChartSpecService | None = None,
         orchestrator: LangGraphOrchestratorAgent | None = None,
-        max_chars: int = 4000,
+        max_chars: int = 5000,
         max_tool_iterations: int = 8,
         **kwargs: Any,
     ) -> None:

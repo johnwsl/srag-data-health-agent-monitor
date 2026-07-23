@@ -28,7 +28,36 @@ class FakeMetricsService:
 
 SAMPLE_METRICS_PAYLOAD = {
     "sg_uf_not": "SP",
-    "metricas": {"taxa_aumento_casos": {"taxa_aumento_percentual": 100.0}},
+    "metricas": {
+        "taxa_aumento_casos": {
+            "mes_atual_ano": 2026,
+            "mes_atual_mes": 6,
+            "mes_anterior_ano": 2026,
+            "mes_anterior_mes": 5,
+            "casos_mes_atual": 100,
+            "casos_mes_anterior": 80,
+            "taxa_aumento_percentual": 25.0,
+        },
+        "taxa_mortalidade": {
+            "mes_atual_ano": 2026,
+            "mes_atual_mes": 6,
+            "mes_anterior_ano": 2026,
+            "mes_anterior_mes": 5,
+            "total_casos_2_meses": 180,
+            "total_obitos_2_meses": 9,
+            "taxa_mortalidade_percentual": 5.0,
+        },
+        "taxa_ocupacao_uti": {
+            "total_casos_2_meses": 180,
+            "casos_com_uti_2_meses": 36,
+            "taxa_ocupacao_uti_percentual": 20.0,
+        },
+        "taxa_vacinacao_populacao": {
+            "total_casos_2_meses": 180,
+            "casos_vacinados_2_meses": 90,
+            "taxa_vacinacao_percentual": 50.0,
+        },
+    },
     "casos_diarios": {
         "sg_uf_not": "SP",
         "pontos": [
@@ -51,6 +80,13 @@ def test_generate_executive_summary_composes_report_with_llm():
     llm = MagicMock()
     llm.ask.return_value = "Resumo executivo.\nDados oficiais: ...\nNoticias: ..."
     news = MagicMock()
+    news.listar_noticias.return_value = [
+        {
+            "title": "SRAG em queda no Brasil",
+            "url": "https://www.gov.br/saude/srag",
+            "snippet": "Boletim aponta redução de casos.",
+        }
+    ]
     news.buscar_noticias.return_value = "Sem eventos criticos."
     orchestrator = LangGraphOrchestratorAgent(
         llm_service=llm,
@@ -64,18 +100,26 @@ def test_generate_executive_summary_composes_report_with_llm():
 
     response = agent.generate_executive_summary("sp")
 
-    assert response["resumo_executivo"] == "Resumo executivo.\nDados oficiais: ...\nNoticias: ..."
+    resumo = response["resumo_executivo"]
+    assert "Resumo executivo." in resumo
+    assert "## Quatro métricas principais" in resumo
+    assert "| Taxa de aumento de casos |" in resumo
+    assert "25,00%" in resumo
+    assert "## Notícias encontradas" in resumo
+    assert "[SRAG em queda no Brasil](https://www.gov.br/saude/srag)" in resumo
+    assert "https://www.gov.br/saude/srag" in resumo
     assert [chart.id for chart in response["charts"]] == ["casos_diarios", "casos_mensais"]
     assert metrics_service.ensure_calls == 1
     assert metrics_service.metrics_calls == ["SP"]
     llm.ask.assert_called_once()
-    news.buscar_noticias.assert_called_once()
+    news.listar_noticias.assert_called_once()
 
 
-def test_generate_executive_summary_limits_output_to_4000_chars():
+def test_generate_executive_summary_limits_output_to_5000_chars():
     llm = MagicMock()
-    llm.ask.return_value = "A" * 4500
+    llm.ask.return_value = "A" * 5500
     news = MagicMock()
+    news.listar_noticias.return_value = []
     news.buscar_noticias.return_value = "Noticias."
     metrics_service = FakeMetricsService(SAMPLE_METRICS_PAYLOAD)
     orchestrator = LangGraphOrchestratorAgent(
@@ -89,8 +133,8 @@ def test_generate_executive_summary_limits_output_to_4000_chars():
 
     response = SragReportAgent(orchestrator=orchestrator).generate_executive_summary("BRASIL")
 
-    assert len(response["resumo_executivo"]) <= 4000
-    assert response["resumo_executivo"].endswith("...")
+    assert len(response["resumo_executivo"]) <= 5000
+    assert "## Quatro métricas principais" in response["resumo_executivo"]
     assert len(response["charts"]) == 2
 
 
@@ -98,6 +142,7 @@ def test_generate_executive_summary_includes_charts_from_metrics():
     llm = MagicMock()
     llm.ask.return_value = "Resumo sem chamada explicita de grafico."
     news = MagicMock()
+    news.listar_noticias.return_value = []
     news.buscar_noticias.return_value = "Noticias."
     metrics_service = FakeMetricsService(SAMPLE_METRICS_PAYLOAD)
     orchestrator = LangGraphOrchestratorAgent(
@@ -131,3 +176,25 @@ def test_generate_executive_summary_rejects_invalid_uf():
         assert False, "deveria ter levantado ValueError"
     except ValueError as error:
         assert "UF invalida" in str(error)
+
+
+def test_humanize_report_text_converts_bullets_to_prose():
+    orchestrator = LangGraphOrchestratorAgent(
+        llm_service=MagicMock(),
+        metrics_service=FakeMetricsService(SAMPLE_METRICS_PAYLOAD),
+        news_service=MagicMock(),
+        chart_spec_service=ChartSpecService(),
+        graph=MagicMock(),
+        audit_service=AgentAuditService(enabled=False),
+    )
+    raw = (
+        "Taxa de Aumento de Casos:\n"
+        "- Casos em Junho de 2026: 51.892\n"
+        "- Casos em Maio de 2026: 63.305\n"
+        "- Taxa de Aumento Percentual: -18,03%\n"
+    )
+    prose = orchestrator._humanize_report_text(raw)
+    assert "•" not in prose
+    assert "- Casos" not in prose
+    assert "51.892" in prose
+    assert "Taxa de Aumento de Casos" in prose

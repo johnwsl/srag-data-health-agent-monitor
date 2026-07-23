@@ -63,19 +63,16 @@ class TavilyNewsLangChainService:
         )
 
     def buscar_noticias(self) -> str:
-        response = self._tool.invoke({"query": TAVILY_SEARCH_QUERY})
-        results = self._extract_results(response)
-        filtered_results = self._filter_results(results)
+        filtered_results = self.listar_noticias()
 
         if not filtered_results:
             return "Nenhuma noticia relevante sobre SRAG no Brasil foi encontrada."
 
         lines = ["Noticias recentes sobre SRAG no Brasil:"]
-        for index, item in enumerate(filtered_results[: self.max_results], start=1):
+        for index, item in enumerate(filtered_results, start=1):
             title = item.get("title", "Sem titulo").strip()
             url = item.get("url", "").strip()
-            content = item.get("content", "").strip()
-            snippet = self._summarize_content(content)
+            snippet = item.get("snippet", "").strip()
             lines.append(f"{index}. {title}")
             if snippet:
                 lines.append(f"   Resumo: {snippet}")
@@ -83,6 +80,20 @@ class TavilyNewsLangChainService:
                 lines.append(f"   URL: {url}")
 
         return "\n".join(lines)
+
+    def listar_noticias(self) -> list[dict[str, str]]:
+        """Retorna noticias filtradas como lista estruturada (titulo, url, resumo)."""
+        response = self._tool.invoke({"query": TAVILY_SEARCH_QUERY})
+        results = self._extract_results(response)
+        filtered_results = self._filter_results(results)
+
+        items: list[dict[str, str]] = []
+        for item in filtered_results[: self.max_results]:
+            title = str(item.get("title", "Sem titulo")).strip() or "Sem titulo"
+            url = str(item.get("url", "")).strip()
+            snippet = self._summarize_content(str(item.get("content", "")).strip())
+            items.append({"title": title, "url": url, "snippet": snippet})
+        return items
 
     def _extract_results(self, response) -> list[dict]:
         if isinstance(response, dict) and "results" in response:

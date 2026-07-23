@@ -292,7 +292,7 @@ bullets(
     [
         "Fonte oficial = API SRAG do próprio projeto.",
         "UF inválida → HTTP 422; falha de geração → HTTP 502.",
-        "Resumo executivo limitado a ~4000 caracteres.",
+        "Resumo executivo limitado a ~5000 caracteres.",
         "Falha ao gravar auditoria <b>não</b> interrompe a resposta ao usuário.",
     ]
 )

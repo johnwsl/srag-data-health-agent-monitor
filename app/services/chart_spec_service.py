@@ -14,7 +14,7 @@ class ChartToolInput(BaseModel):
 
 
 class ChartSpecService:
-    """Monta ChartSpec a partir de payloads oficiais da API SRAG."""
+    """Monta ChartSpec a partir de payloads da API SRAG."""
 
     def __init__(self) -> None:
         self.generated_charts: list[ChartSpec] = []
@@ -51,7 +51,7 @@ class ChartSpecService:
         return ChartSpec(
             id="casos_diarios",
             type="line",
-            title=f"Casos diários de SRAG — {scope}",
+            title=f"Casos diários de SRAG (últimos 30 dias) — {scope}",
             x=ChartAxisSpec(field="data", label="Data"),
             y=ChartAxisSpec(field="casos", label="Notificações"),
             data=data,
@@ -74,7 +74,7 @@ class ChartSpecService:
         return ChartSpec(
             id="casos_mensais",
             type="bar",
-            title=f"Casos mensais de SRAG — {scope}",
+            title=f"Casos mensais de SRAG (últimos 12 meses) — {scope}",
             x=ChartAxisSpec(field="label", label="Mês"),
             y=ChartAxisSpec(field="casos", label="Notificações"),
             data=data,
@@ -109,7 +109,7 @@ class ChartSpecService:
             func=gerar_especificacao_grafico,
             name="gerar_especificacao_grafico",
             description=(
-                "Gera a especificacao oficial (ChartSpec) de um grafico de SRAG para uma UF "
+                "Gera a especificacao ChartSpec de um grafico SRAG para uma UF "
                 "ou BRASIL. Use serie='diaria' para linha dos ultimos 30 dias ou "
                 "serie='mensal' para barras dos ultimos 12 meses. Nao inventa dados."
             ),

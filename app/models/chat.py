@@ -22,7 +22,7 @@ class ChatReportPayload(BaseModel):
     resumo_executivo: str = Field(description="Texto completo do relatorio executivo.")
     charts: list[ChartSpec] = Field(
         default_factory=list,
-        description="Graficos oficiais do relatorio.",
+        description="Graficos SRAG do relatorio.",
     )
 
 

@@ -51,6 +51,7 @@ No dashboard, peço análises ou um relatório no **chatbot** (informe a UF ou B
 | `GET` | `/metrics/{estado}/casos-mensais` | Série mensal (últimos 12 meses) |
 | `POST` | `/agents/chat` | Chatbot LangGraph (métricas, notícias, relatório) |
 | `POST` | `/agents/report` | Relatório executivo one-shot (API) |
+| `POST` | `/agents/report/pdf` | Exporta relatório já gerado em PDF |
 | `GET` | `/agents/audit` | Lista eventos de auditoria |
 | `GET` | `/agents/audit/session/{session_id}` | Trilha de uma sessão |
 | `GET` | `/agents/audit/{audit_id}` | Detalhe de um evento |

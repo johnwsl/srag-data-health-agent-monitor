@@ -1,9 +1,10 @@
 from fastapi import APIRouter, Query
+from fastapi.responses import Response
 
 from app.controllers.agent_controller import AgentController
 from app.models.agent import ExecutiveSummaryRequest, ExecutiveSummaryResponse
 from app.models.audit import AgentAuditListResponse, AgentAuditRecord, AgentAuditSessionResponse
-from app.models.chat import ChatRequest, ChatResponse
+from app.models.chat import ChatReportPayload, ChatRequest, ChatResponse
 
 router = APIRouter(prefix="/agents", tags=["agents"])
 controller = AgentController()
@@ -13,6 +14,21 @@ controller = AgentController()
 def generate_report(payload: ExecutiveSummaryRequest) -> ExecutiveSummaryResponse:
     """Gera um resumo executivo com dados oficiais SRAG e noticias recentes."""
     return controller.generate_report(payload)
+
+
+@router.post("/report/pdf")
+def export_report_pdf(payload: ChatReportPayload) -> Response:
+    """Exporta um relatorio ja gerado (texto + ChartSpecs) como PDF para download."""
+    pdf_bytes = controller.export_report_pdf(payload)
+    scope = (payload.estado or "BRASIL").strip().upper() or "BRASIL"
+    filename = f"relatorio_srag_{scope}.pdf"
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+        },
+    )
 
 
 @router.post("/chat", response_model=ChatResponse)

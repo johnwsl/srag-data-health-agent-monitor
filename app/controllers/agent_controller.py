@@ -9,6 +9,7 @@ from app.models.audit import (
 from app.models.chat import ChatReportPayload, ChatRequest, ChatResponse
 from app.services.agent_audit_service import AgentAuditService
 from app.services.langgraph_orchestrator_agent import LangGraphOrchestratorAgent
+from app.services.report_pdf_service import ReportPdfService
 
 
 class AgentController:
@@ -16,9 +17,11 @@ class AgentController:
         self,
         orchestrator: LangGraphOrchestratorAgent | None = None,
         audit_service: AgentAuditService | None = None,
+        pdf_service: ReportPdfService | None = None,
     ):
         self.orchestrator = orchestrator
         self.audit_service = audit_service
+        self.pdf_service = pdf_service or ReportPdfService()
 
     def _get_orchestrator(self) -> LangGraphOrchestratorAgent:
         if self.orchestrator is None:
@@ -54,6 +57,21 @@ class AgentController:
             charts=result.get("charts") or [],
             audit_id=result.get("audit_id"),
         )
+
+    def export_report_pdf(self, payload: ChatReportPayload) -> bytes:
+        resumo = (payload.resumo_executivo or "").strip()
+        if not resumo:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail="resumo_executivo e obrigatorio para exportar o PDF.",
+            )
+        try:
+            return self.pdf_service.build(payload)
+        except Exception as error:  # noqa: BLE001
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Falha ao gerar PDF do relatorio: {error}",
+            ) from error
 
     def chat(self, payload: ChatRequest) -> ChatResponse:
         try:

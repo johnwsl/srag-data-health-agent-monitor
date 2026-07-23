@@ -4,7 +4,7 @@ Diagrama e componentes da solução **SRAG Data Health Agent Monitor**: frontend
 
 ## Visão Geral
 
-A solução combina dados oficiais de SRAG (OpenDataSUS), DuckDB, API FastAPI, dashboard Shiny e um orquestrador LangGraph com chatbot, relatório executivo, gráficos oficiais (`ChartSpec`) e trilha de auditoria.
+A solução combina dados oficiais de SRAG (OpenDataSUS), DuckDB, API FastAPI, dashboard Shiny e um orquestrador LangGraph com chatbot, relatório executivo, gráficos SRAG (`ChartSpec`) e trilha de auditoria.
 
 O fluxo principal é o **chatbot**: o usuário conversa; o `LangGraphOrchestratorAgent` **toma decisões** (ReAct) sobre quais tools chamar e se gera relatório ou só responde no chat.
 
@@ -62,7 +62,7 @@ flowchart LR
 Dashboard **Shiny for Python** em `http://localhost:8080`:
 
 - **Chatbot** — perguntas pontuais ou pedido explícito de relatório (informe UF ou Brasil)
-- **Relatório gerado por IA** — texto completo + gráficos Plotly (não aparece no chat)
+- **Relatório gerado por IA** — texto completo + gráficos Plotly (não aparece no chat); botão **Baixar PDF**
 - Escopo e período analisado são informados pelo agente nas respostas
 - Sem filtro lateral de UF e sem botão “Gerar Relatório por IA”
 
@@ -75,7 +75,7 @@ Rotas principais:
 - `GET /health`
 - `POST /datasets/download` · `POST /datasets/etl` · `POST /datasets/pipeline` · `GET /datasets/status`
 - `GET /metrics/{estado}` · `/casos-diarios` · `/casos-mensais`
-- `POST /agents/chat` · `POST /agents/report`
+- `POST /agents/chat` · `POST /agents/report` · `POST /agents/report/pdf`
 - `GET /agents/audit` · `/agents/audit/session/{session_id}` · `/agents/audit/{audit_id}`
 
 ### Camada de dados
@@ -106,7 +106,7 @@ Características:
 |------|--------|
 | `consultar_metricas_srag` | 4 métricas + séries consolidadas |
 | `consultar_serie_temporal` | Série diária ou mensal |
-| `gerar_especificacao_grafico` | `ChartSpec` oficial (dados da API) |
+| `gerar_especificacao_grafico` | `ChartSpec` SRAG (dados da API) |
 | `buscar_noticias_srag` | Tavily + guardrails de conteúdo |
 | `gerar_relatorio_executivo` | Relatório completo (só pedido explícito) |
 
@@ -157,5 +157,5 @@ No dashboard, o analista consegue:
 
 - conversar sobre métricas, tendências e notícias de SRAG;
 - pedir relatório executivo citando UF ou Brasil;
-- ver gráficos oficiais no painel de relatório;
+- ver gráficos SRAG no painel de relatório;
 - rastrear execuções via API de auditoria.
