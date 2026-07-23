@@ -1,6 +1,8 @@
-# SRAG Data Health Agent Monitor
+# SRAG Data Health Agent Chatbot Monitor
 
 Solução para monitoramento de **SRAG** (Síndrome Respiratória Aguda Grave) com dados do [OpenDataSUS](https://opendatasus.saude.gov.br/). O projeto executa download e ETL dos datasets, persiste os dados em **DuckDB**, expõe **métricas de saúde** via **FastAPI**, disponibiliza um **agente chatbot web em [http://localhost:8080](http://localhost:8080)** e inclui um **agente de IA** que gera resumos executivos com dados oficiais e notícias (**Tavily Search**), com download em **PDF**.
+
+**Link Youtube - Vídeo de Demonstração:** https://www.youtube.com/watch?v=Q49YHI8IKac
 
 ![Figura — chatbot_agent_monitor](docs/chatbot_agent_monitor.png)
 ![Figura — relatorio](docs/relatorio.png)
