@@ -444,7 +444,7 @@ with ui.div(class_="srag-main"):
     with ui.div(class_="srag-header"):
         ui.h2("Agente Chatbot - Monitor de Saúde SRAG", class_="srag-page-title")
         ui.p(
-            "Peça análises ou um relatório executivo no chatbot — informe uma UF (ex.: SP, RJ) ou Brasil.",
+            "Peça análises ou um relatório executivo no chatbot — informe uma UF (ex.: SP, Pernambuco e etc.) ou Brasil.",
             class_="srag-page-subtitle",
         )
 
@@ -464,7 +464,7 @@ with ui.div(class_="srag-main"):
         )
 
     with ui.card(class_="srag-chat-section"):
-        ui.card_header("Chatbot SRAG (LangGraph)")
+        ui.card_header("Chatbot")
 
         @render.ui
         def chat_panel():
@@ -499,7 +499,7 @@ with ui.div(class_="srag-main"):
                 body.append(
                     ui.p(
                         "Pergunte sobre métricas/tendências ou peça um relatório executivo "
-                        "citando a UF (ex.: SP) ou Brasil. O relatório completo aparece na seção abaixo.",
+                        "citando a UF (ex.: SP, Pernambuco e etc.) ou Brasil. O relatório completo aparece na seção abaixo.",
                         class_="srag-page-subtitle",
                     )
                 )

@@ -32,7 +32,7 @@ class LangGraphOrchestratorAgent:
         "buscar_noticias_srag (Tavily) e gerar_relatorio_executivo. "
         "Identifique UF (sigla) ou BRASIL mencionados pelo usuario e use esse escopo nas tools. "
         "Nas respostas do chat que usem metricas oficiais, informe explicitamente o escopo "
-        "(UF ou BRASIL) e o periodo analisado (ex.: 05/2026 -> 06/2026), usando os campos "
+        "(UF ou BRASIL) e o periodo analisado para o cálculo das metricas (ex.: 05/2026 -> 06/2026), usando os campos "
         "mes_anterior_* e mes_atual_* retornados pelas tools — nao invente o periodo. "
         "Se o usuario pedir relatorio, resumo executivo ou painel completo, chame "
         "gerar_relatorio_executivo com o estado correto. "
