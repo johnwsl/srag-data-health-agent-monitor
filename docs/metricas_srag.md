@@ -118,7 +118,7 @@ As métricas alimentam o orquestrador e o relatório no dashboard (`shiny_app/da
 - **Docker:** [http://localhost:8080](http://localhost:8080)
 - **Local:** `shiny run shiny_app/dashboard.py --host 127.0.0.1 --port 8080`
 
-O dashboard consome a API (`API_BASE_URL`). Escopo (UF/`BRASIL`) e período analisado são informados pelo **chatbot**; o relatório e os gráficos SRAG (`ChartSpec` → Plotly) aparecem na seção **Relatório gerado por IA**.
+O dashboard consome a API (`API_BASE_URL`). Escopo (UF/`BRASIL`) e período analisado são informados pelo **chatbot**; o relatório e os gráficos SRAG (`ChartSpec` → Plotly) aparecem na seção **Relatório gerado por IA**. O download PDF usa as mesmas métricas/séries embutidas no relatório (`POST /agents/report/pdf`).
 
 ---
 

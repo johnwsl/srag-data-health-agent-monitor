@@ -1,6 +1,6 @@
 # SRAG Data Health Agent Monitor
 
-Solução para monitoramento de **SRAG** (Síndrome Respiratória Aguda Grave) com dados do [OpenDataSUS](https://opendatasus.saude.gov.br/). O projeto executa download e ETL dos datasets, persiste os dados em **DuckDB**, expõe **métricas de saúde** via **FastAPI**, disponibiliza um **agente chatbot web em [http://localhost:8080](http://localhost:8080)** e inclui um **agente de IA** que gera resumos executivos com dados oficiais e notícias (**Tavily Search**).
+Solução para monitoramento de **SRAG** (Síndrome Respiratória Aguda Grave) com dados do [OpenDataSUS](https://opendatasus.saude.gov.br/). O projeto executa download e ETL dos datasets, persiste os dados em **DuckDB**, expõe **métricas de saúde** via **FastAPI**, disponibiliza um **agente chatbot web em [http://localhost:8080](http://localhost:8080)** e inclui um **agente de IA** que gera resumos executivos com dados oficiais e notícias (**Tavily Search**), com download em **PDF**.
 
 ![Figura — chatbot_agent_monitor](docs/chatbot_agent_monitor.png)
 ![Figura — relatorio](docs/relatorio.png)
@@ -26,7 +26,7 @@ O sistema entrega cinco blocos principais:
 4. **Pipeline** — Orquestra download + ETL em uma única chamada.
 5. **Métricas** — Taxa de aumento de casos, mortalidade, ocupação de UTI e vacinação COVID (UF ou `BRASIL`).
 6. **Dashboard** — Interface Shiny em **[http://localhost:8080](http://localhost:8080)** com chatbot e seção de relatório.
-7. **Chatbot / relatório** — Orquestrador único (`LangGraphOrchestratorAgent`) com tools dinâmicas, Tavily e `ChartSpec`.
+7. **Chatbot / relatório** — Orquestrador único (`LangGraphOrchestratorAgent`) com tools dinâmicas, Tavily e `ChartSpec`; relatório em prosa + tabela de métricas + notícias com links; exportação PDF (ReportLab).
 8. **Auditoria** — Cada chat/relatório grava evento em `agent_audit_log` (consultável via API).
 
 ## Acesso rápido
@@ -35,7 +35,7 @@ O sistema entrega cinco blocos principais:
 - **API:** [http://localhost:8000](http://localhost:8000)
 - **Swagger / OpenAPI:** [http://localhost:8000/docs](http://localhost:8000/docs)
 
-No dashboard, peço análises ou um relatório no **chatbot** (informe a UF ou Brasil). O texto completo do relatório aparece em **Relatório gerado por IA**, não no chat.
+No dashboard, peça análises ou um relatório no **chatbot** (informe a UF ou Brasil). O texto completo e os gráficos aparecem em **Relatório gerado por IA**; no chat surge uma bolha com **Baixar PDF** quando o relatório fica pronto.
 
 ## Endpoints principais
 
@@ -66,6 +66,12 @@ curl -X POST http://localhost:8000/agents/chat \
   -H "Content-Type: application/json" \
   -d "{\"message\":\"Gere o relatório executivo do Brasil\"}"
 
+# Exporta PDF a partir de um relatório já gerado (estado + resumo + charts)
+curl -X POST http://localhost:8000/agents/report/pdf \
+  -H "Content-Type: application/json" \
+  -d "{\"estado\":\"BRASIL\",\"resumo_executivo\":\"...\",\"charts\":[]}" \
+  --output relatorio_srag_BRASIL.pdf
+
 curl "http://localhost:8000/agents/audit?limit=10"
 ```
 
@@ -77,7 +83,7 @@ Padrão **MVC**:
 |--------|------------------|----------|
 | **Views** (`app/views/`) | Rotas HTTP | `dataset_routes.py`, `metrics_routes.py`, `agent_routes.py` |
 | **Controllers** (`app/controllers/`) | Orquestração HTTP | `pipeline_controller.py`, `metrics_controller.py`, `agent_controller.py` |
-| **Services** (`app/services/`) | Regras de negócio | `etl_service.py`, `srag_metrics.py`, `langgraph_orchestrator_agent.py`, `agent_audit_service.py` |
+| **Services** (`app/services/`) | Regras de negócio | `etl_service.py`, `srag_metrics.py`, `langgraph_orchestrator_agent.py`, `report_pdf_service.py`, `agent_audit_service.py` |
 | **Models** (`app/models/`) | Schemas Pydantic | `metrics.py`, `chat.py`, `agent.py`, `audit.py`, `chart.py` |
 
 ```mermaid
@@ -92,6 +98,8 @@ flowchart LR
     F --> H[OpenAI]
     F --> I[agent_audit_log]
     F --> E
+    E -->|POST /agents/report/pdf| J[ReportPdfService]
+    J --> E
 ```
 
 Mais detalhes: [`docs/arquitetura_solucao_srag.md`](docs/arquitetura_solucao_srag.md) e [`docs/agente_orquestrador.md`](docs/agente_orquestrador.md).
@@ -133,7 +141,8 @@ curl -X POST http://localhost:8000/datasets/pipeline
 **http://localhost:8080**
 
 - Chatbot para perguntas pontuais ou pedido de relatório (UF / Brasil)
-- Seção **Relatório gerado por IA** (texto + gráficos Plotly)
+- Bolha dinâmica **Baixar PDF** no próprio chat quando há relatório
+- Seção **Relatório gerado por IA** (texto completo + gráficos SRAG Plotly)
 - Escopo e período são informados pelo agente no chat
 
 ### 6. Chat / relatório / auditoria via API
@@ -196,7 +205,7 @@ pip install -r requirements.txt
 pytest
 ```
 
-A suíte cobre download, ETL, métricas, rotas, Tavily, OpenAI, orquestrador LangGraph, chat/report e auditoria.
+A suíte cobre download, ETL, métricas, rotas, Tavily, OpenAI, orquestrador LangGraph, chat/report, exportação PDF e auditoria.
 
 ## Documentação
 
@@ -205,7 +214,7 @@ A suíte cobre download, ETL, métricas, rotas, Tavily, OpenAI, orquestrador Lan
 | [`docs/arquitetura_solucao_srag.md`](docs/arquitetura_solucao_srag.md) | Arquitetura conceitual (frontend, API, LangGraph, tools, LLM, DuckDB, Tavily, auditoria) |
 | [`docs/etl_pipeline.md`](docs/etl_pipeline.md) | Download, ETL, configuração e exemplos |
 | [`docs/metricas_srag.md`](docs/metricas_srag.md) | Cálculo das métricas, escopo UF/Brasil, endpoints |
-| [`docs/agente_orquestrador.md`](docs/agente_orquestrador.md) | Orquestrador, tools, chatbot, relatório, guardrails e auditoria |
+| [`docs/agente_orquestrador.md`](docs/agente_orquestrador.md) | Orquestrador, tools, chatbot, relatório, PDF, guardrails e auditoria |
 
 ## Stack
 
@@ -214,7 +223,8 @@ A suíte cobre download, ETL, métricas, rotas, Tavily, OpenAI, orquestrador Lan
 - **pandas** — ETL
 - **DuckDB** — Persistência analítica + auditoria do agente
 - **Shiny for Python** — Dashboard
-- **Plotly** — Renderização de `ChartSpec`
+- **Plotly** — Renderização de `ChartSpec` no dashboard
+- **ReportLab** — PDF do relatório (texto, tabela, links e gráficos)
 - **LangGraph / LangChain** — Orquestrador e tools
 - **OpenAI** — LLM (`ChatOpenAI`)
 - **Tavily Search** — Notícias sobre SRAG

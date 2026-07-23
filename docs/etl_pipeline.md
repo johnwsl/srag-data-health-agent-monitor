@@ -455,7 +455,7 @@ curl http://localhost:8000/metrics/RJ
 
 ### Dashboard
 
-Com a API em execução, o dashboard Shiny está em **[http://localhost:8080](http://localhost:8080)** (serviço `dashboard` no Docker ou `shiny run shiny_app/dashboard.py` localmente). Use o **chatbot** para consultar métricas/tendências ou pedir um relatório executivo (informe UF ou Brasil). O texto completo e os gráficos aparecem na seção **Relatório gerado por IA**.
+Com a API em execução, o dashboard Shiny está em **[http://localhost:8080](http://localhost:8080)** (serviço `dashboard` no Docker ou `shiny run shiny_app/dashboard.py` localmente). Use o **chatbot** para consultar métricas/tendências ou pedir um relatório executivo (informe UF ou Brasil). O texto completo e os gráficos aparecem na seção **Relatório gerado por IA**; a bolha **Baixar PDF** surge no chat quando o relatório está pronto.
 
 ---
 
@@ -501,9 +501,9 @@ srag-data-health-agent-monitor/
 
 Com os dados no DuckDB e as métricas expostas pela API, a aplicação oferece:
 
-- **Dashboard Shiny** em [http://localhost:8080](http://localhost:8080) — chatbot + relatório por IA
-- **Orquestrador LangGraph** via `POST /agents/chat` (fluxo principal) e `POST /agents/report` (one-shot); ver [`agente_orquestrador.md`](agente_orquestrador.md)
+- **Dashboard Shiny** em [http://localhost:8080](http://localhost:8080) — chatbot, relatório por IA e download PDF
+- **Orquestrador LangGraph** via `POST /agents/chat` (fluxo principal), `POST /agents/report` (one-shot) e `POST /agents/report/pdf`; ver [`agente_orquestrador.md`](agente_orquestrador.md)
 - **Auditoria** em `agent_audit_log` (`GET /agents/audit`)
-- **Séries temporais** consumidas como `ChartSpec` / Plotly no relatório
+- **Séries temporais** consumidas como `ChartSpec` / Plotly no relatório e no PDF
 
 O pipeline e as métricas formam a **base de dados e indicadores** sobre os quais o dashboard e o orquestrador operam.

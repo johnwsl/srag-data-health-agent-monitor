@@ -4,7 +4,7 @@ Diagrama e componentes da solução **SRAG Data Health Agent Monitor**: frontend
 
 ## Visão Geral
 
-A solução combina dados oficiais de SRAG (OpenDataSUS), DuckDB, API FastAPI, dashboard Shiny e um orquestrador LangGraph com chatbot, relatório executivo, gráficos SRAG (`ChartSpec`) e trilha de auditoria.
+A solução combina dados oficiais de SRAG (OpenDataSUS), DuckDB, API FastAPI, dashboard Shiny e um orquestrador LangGraph com chatbot, relatório executivo (PDF incluído), gráficos SRAG (`ChartSpec`) e trilha de auditoria.
 
 O fluxo principal é o **chatbot**: o usuário conversa; o `LangGraphOrchestratorAgent` **toma decisões** (ReAct) sobre quais tools chamar e se gera relatório ou só responde no chat.
 
@@ -49,6 +49,10 @@ flowchart LR
     ReportTool --> LLM[OpenAI ChatOpenAI]
     Orchestrator --> LLM
 
+    Frontend -->|POST /agents/report/pdf| PdfEndpoint[Report PDF]
+    PdfEndpoint --> ReportPdf[ReportPdfService<br/>ReportLab]
+    ReportPdf --> Frontend
+
     Orchestrator --> Audit[AgentAuditService]
     Audit --> DuckDB
 
@@ -62,7 +66,8 @@ flowchart LR
 Dashboard **Shiny for Python** em `http://localhost:8080`:
 
 - **Chatbot** — perguntas pontuais ou pedido explícito de relatório (informe UF ou Brasil)
-- **Relatório gerado por IA** — texto completo + gráficos Plotly (não aparece no chat); botão **Baixar PDF**
+- **Bolha Baixar PDF** — aparece dinamicamente no log do chat quando `report` está disponível (host estável dentro de `#srag-chat-log`; não é recriada a cada mensagem)
+- **Relatório gerado por IA** — texto completo + gráficos SRAG Plotly (o texto longo não vai nas bolhas de resposta)
 - Escopo e período analisado são informados pelo agente nas respostas
 - Sem filtro lateral de UF e sem botão “Gerar Relatório por IA”
 
@@ -110,7 +115,18 @@ Características:
 | `buscar_noticias_srag` | Tavily + guardrails de conteúdo |
 | `gerar_relatorio_executivo` | Relatório completo (só pedido explícito) |
 
-O dashboard **renderiza** os `ChartSpec` com Plotly; o orquestrador não gera imagem.
+O dashboard **renderiza** os `ChartSpec` com Plotly; o orquestrador não gera imagem. A exportação PDF (`ReportPdfService` / ReportLab) redesenha os gráficos no PDF a partir dos mesmos `ChartSpec`.
+
+## Conteúdo do relatório executivo
+
+Ao chamar `gerar_relatorio_executivo`, o orquestrador monta:
+
+1. **Narrativa** (LLM) — prosa contínua (até ~3500 caracteres), sem listas/tabelas/URLs
+2. **Tabela** `## Quatro métricas principais` — markdown gerado a partir da API
+3. **Notícias** `## Notícias encontradas` — títulos com links + snippet (Tavily)
+4. **Charts** — `ChartSpec` diário/mensal para o dashboard e para o PDF
+
+Limite total do `resumo_executivo`: **5000** caracteres.
 
 ## Fluxo do chatbot e do relatório
 
@@ -141,7 +157,13 @@ sequenceDiagram
     end
     O->>DB: agent_audit_log
     A-->>F: ChatResponse
-    F-->>U: Chat + seção Relatório (se houver)
+    F-->>U: Chat (reply curto)
+    opt Relatório gerado
+        F-->>U: Seção Relatório + bolha Baixar PDF
+        U->>F: Baixar PDF
+        F->>A: POST /agents/report/pdf
+        A-->>F: application/pdf
+    end
 ```
 
 ## Auditoria / governança
@@ -157,5 +179,6 @@ No dashboard, o analista consegue:
 
 - conversar sobre métricas, tendências e notícias de SRAG;
 - pedir relatório executivo citando UF ou Brasil;
-- ver gráficos SRAG no painel de relatório;
+- ver o relatório completo e os gráficos SRAG no painel de relatório;
+- baixar o PDF pela bolha dinâmica no chatbot;
 - rastrear execuções via API de auditoria.

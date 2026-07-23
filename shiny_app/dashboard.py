@@ -102,6 +102,12 @@ ui.tags.style(
         gap: 0.75rem;
         margin-bottom: 1rem;
     }
+    .srag-chat-messages {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+        width: 100%;
+    }
     .srag-chat-bubble {
         border-radius: 0.5rem;
         padding: 0.75rem 1rem;
@@ -138,14 +144,17 @@ ui.tags.style(
         gap: 0.5rem;
         margin-top: 0.75rem;
     }
-    .srag-chat-pdf-bubble {
+    #srag-pdf-offer-host {
         display: none;
+        width: 100%;
+        flex-shrink: 0;
+    }
+    .srag-chat-pdf-bubble {
+        display: flex;
         flex-direction: column;
         gap: 0.5rem;
-        margin-top: 0.75rem;
-    }
-    .srag-chat-pdf-bubble.is-visible {
-        display: flex;
+        align-self: flex-start;
+        max-width: 95%;
     }
     .srag-chat-pdf-bubble .shiny-download-link,
     .srag-chat-pdf-bubble a.btn {
@@ -552,7 +561,7 @@ with ui.div(class_="srag-main"):
         ui.h2("Agente Chatbot - Monitor de Saúde SRAG", class_="srag-page-title")
         ui.p(
             "Peça análises ou um relatório executivo no chatbot — informe uma UF (ex.: SP, Pernambuco) ou Brasil. "
-            "Quando o relatório for gerado, o download em PDF aparece em uma bolha do chat.",
+            "Quando o relatório for gerado, o download em PDF aparece em uma bolha (ou balão) do chat.",
             class_="srag-page-subtitle",
         )
 
@@ -575,151 +584,146 @@ with ui.div(class_="srag-main"):
         ui.card_header("Chatbot")
 
         @render.ui
-        def chat_panel():
-            if pipeline_phase.get() != "ready":
-                return ui.p(
-                    "Aguarde a preparação dos dados para usar o chatbot.",
-                    class_="srag-page-subtitle",
-                )
-
-            bubbles = []
-            for item in chat_messages.get():
-                role = item.get("role")
-                css = "srag-chat-bubble srag-chat-user" if role == "user" else "srag-chat-bubble srag-chat-assistant"
-                label = "Você" if role == "user" else "Assistente"
-                children = [ui.strong(label), ui.p(item.get("content") or "", style="margin-bottom: 0;")]
-                tools = item.get("tools_used") or []
-                if tools:
-                    children.append(ui.p(f"Tools: {', '.join(tools)}", class_="srag-chat-tools"))
-                bubbles.append(ui.div(*children, class_=css))
-
-            if chat_awaiting_reply.get() or chat_task.status() == "running":
-                bubbles.append(
-                    ui.div(
-                        ui.strong("Assistente"),
-                        ui.p("Consultando tools e gerando resposta...", style="margin-bottom: 0;"),
-                        class_="srag-chat-bubble srag-chat-assistant srag-loading",
-                    )
-                )
-
-            body = []
-            if not bubbles:
-                body.append(
-                    ui.p(
-                        "Pergunte sobre métricas/tendências ou peça um relatório executivo "
-                        "citando a UF (ex.: SP, Pernambuco) ou Brasil. O relatório completo aparece na seção abaixo; "
-                        "o PDF pode ser baixado pela bolha do chat.",
-                        class_="srag-page-subtitle",
-                    )
-                )
-            else:
-                body.append(ui.div(*bubbles, class_="srag-chat-log", id="srag-chat-log"))
-
-            if chat_error.get():
-                body.append(ui.p(chat_error.get(), class_="srag-error"))
-
-            body.append(ui.p(f"Sessão: {chat_session_id.get()}", class_="srag-chat-meta"))
-            return ui.div(*body)
+        def chat_not_ready():
+            if pipeline_phase.get() == "ready":
+                return ui.div()
+            return ui.p(
+                "Aguarde a preparação dos dados para usar o chatbot.",
+                class_="srag-page-subtitle",
+            )
 
         @render.ui
-        def chat_pdf_download_bubble():
-            report = report_data.get()
-            visible = bool(report) and pipeline_phase.get() == "ready"
-            css = "srag-chat-bubble srag-chat-assistant srag-chat-pdf-bubble"
-            if visible:
-                css += " is-visible"
-
-            if not visible:
-                return ui.div(class_=css, id="srag-chat-pdf-bubble")
-
-            estado = report.get("estado") or "BRASIL"
-            return ui.div(
-                ui.strong("Assistente"),
-                ui.p(
-                    f"O relatório executivo de {scope_label(estado)} está pronto. "
-                    "Baixe o PDF abaixo — o texto completo também está na seção Relatório gerado por IA.",
-                    style="margin-bottom: 0.35rem;",
-                ),
-                class_=css,
-                id="srag-chat-pdf-bubble",
+        def chat_empty_hint():
+            if pipeline_phase.get() != "ready":
+                return ui.div()
+            if chat_messages.get() or chat_awaiting_reply.get() or chat_task.status() == "running":
+                return ui.div()
+            return ui.p(
+                "Pergunte sobre métricas/tendências ou peça um relatório executivo "
+                "citando a UF (ex.: SP, Pernambuco) ou Brasil. O relatório completo aparece na seção abaixo; "
+                "o PDF pode ser baixado pela bolha do chat.",
+                class_="srag-page-subtitle",
             )
 
-        with ui.div(id="srag-chat-pdf-download-slot"):
-            @render.download(
-                label="Baixar PDF",
-                filename=lambda: (
-                    f"relatorio_srag_{(report_data.get() or {}).get('estado', 'BRASIL')}.pdf"
-                ),
-                media_type="application/pdf",
-            )
-            def baixar_relatorio_pdf():
+        with ui.div(class_="srag-chat-log", id="srag-chat-log"):
+            @render.ui
+            def chat_message_bubbles():
+                if pipeline_phase.get() != "ready":
+                    return ui.div()
+
+                bubbles = []
+                for item in chat_messages.get():
+                    role = item.get("role")
+                    css = (
+                        "srag-chat-bubble srag-chat-user"
+                        if role == "user"
+                        else "srag-chat-bubble srag-chat-assistant"
+                    )
+                    label = "Você" if role == "user" else "Assistente"
+                    children = [
+                        ui.strong(label),
+                        ui.p(item.get("content") or "", style="margin-bottom: 0;"),
+                    ]
+                    tools = item.get("tools_used") or []
+                    if tools:
+                        children.append(
+                            ui.p(f"Tools: {', '.join(tools)}", class_="srag-chat-tools")
+                        )
+                    bubbles.append(ui.div(*children, class_=css))
+
+                if chat_awaiting_reply.get() or chat_task.status() == "running":
+                    bubbles.append(
+                        ui.div(
+                            ui.strong("Assistente"),
+                            ui.p(
+                                "Consultando tools e gerando resposta...",
+                                style="margin-bottom: 0;",
+                            ),
+                            class_="srag-chat-bubble srag-chat-assistant srag-loading",
+                        )
+                    )
+
+                if not bubbles:
+                    return ui.div()
+                return ui.div(*bubbles, class_="srag-chat-messages")
+
+            @render.ui
+            def chat_pdf_offer_visibility():
                 report = report_data.get()
-                if not report:
-                    raise ValueError(
-                        "Nenhum relatório disponível. Peça um relatório no chatbot antes de baixar o PDF."
+                visible = (
+                    bool(report)
+                    and pipeline_phase.get() == "ready"
+                    and bool(chat_messages.get())
+                )
+                if visible:
+                    return ui.tags.style(
+                        "#srag-pdf-offer-host { display: block !important; }"
                     )
+                return ui.tags.style(
+                    "#srag-pdf-offer-host { display: none !important; }"
+                )
 
-                charts = report.get("charts") or []
-                serialized_charts = []
-                for chart in charts:
-                    if hasattr(chart, "model_dump"):
-                        serialized_charts.append(chart.model_dump())
-                    else:
-                        serialized_charts.append(chart)
+            with ui.div(id="srag-pdf-offer-host"):
+                with ui.div(class_="srag-chat-bubble srag-chat-assistant srag-chat-pdf-bubble"):
+                    @render.ui
+                    def chat_pdf_offer_text():
+                        report = report_data.get()
+                        if not report or pipeline_phase.get() != "ready":
+                            return ui.div()
+                        estado = report.get("estado") or "BRASIL"
+                        return ui.div(
+                            ui.strong("Assistente"),
+                            ui.p(
+                                f"O relatório executivo de {scope_label(estado)} está pronto. "
+                                "Baixe o PDF abaixo — o texto completo também está na seção "
+                                "Relatório gerado por IA.",
+                                style="margin-bottom: 0.35rem;",
+                            ),
+                        )
 
-                with httpx.Client(timeout=60.0) as client:
-                    response = client.post(
-                        _api_url("/agents/report/pdf"),
-                        json={
-                            "estado": report.get("estado") or "BRASIL",
-                            "resumo_executivo": report.get("resumo_executivo") or "",
-                            "charts": serialized_charts,
-                        },
+                    @render.download(
+                        label="Baixar PDF",
+                        filename=lambda: (
+                            f"relatorio_srag_{(report_data.get() or {}).get('estado', 'BRASIL')}.pdf"
+                        ),
+                        media_type="application/pdf",
                     )
-                    response.raise_for_status()
-                    yield response.content
+                    def baixar_relatorio_pdf():
+                        report = report_data.get()
+                        if not report:
+                            raise ValueError(
+                                "Nenhum relatório disponível. Peça um relatório no chatbot antes de baixar o PDF."
+                            )
 
-        ui.tags.script(
-            """
-            (function () {
-              const syncPdfDownloadBubble = () => {
-                const bubble = document.getElementById("srag-chat-pdf-bubble");
-                const slot = document.getElementById("srag-chat-pdf-download-slot");
-                const log = document.getElementById("srag-chat-log");
-                if (!bubble || !slot) return;
+                        charts = report.get("charts") or []
+                        serialized_charts = []
+                        for chart in charts:
+                            if hasattr(chart, "model_dump"):
+                                serialized_charts.append(chart.model_dump())
+                            else:
+                                serialized_charts.append(chart)
 
-                const btn = slot.querySelector("a, button, .shiny-download-link")
-                  || bubble.querySelector("a.shiny-download-link, a[download], button");
-                if (!btn) return;
+                        with httpx.Client(timeout=60.0) as client:
+                            response = client.post(
+                                _api_url("/agents/report/pdf"),
+                                json={
+                                    "estado": report.get("estado") or "BRASIL",
+                                    "resumo_executivo": report.get("resumo_executivo") or "",
+                                    "charts": serialized_charts,
+                                },
+                            )
+                            response.raise_for_status()
+                            yield response.content
 
-                if (bubble.classList.contains("is-visible")) {
-                  if (log && bubble.parentElement !== log) {
-                    log.appendChild(bubble);
-                  }
-                  if (btn.parentElement !== bubble) {
-                    bubble.appendChild(btn);
-                  }
-                } else if (btn.parentElement !== slot) {
-                  slot.appendChild(btn);
-                }
-                slot.style.display = "none";
-              };
-
-              const obs = new MutationObserver(syncPdfDownloadBubble);
-              obs.observe(document.body, {
-                childList: true,
-                subtree: true,
-                attributes: true,
-                attributeFilter: ["class"],
-              });
-              if (document.readyState === "loading") {
-                document.addEventListener("DOMContentLoaded", syncPdfDownloadBubble);
-              } else {
-                syncPdfDownloadBubble();
-              }
-            })();
-            """
-        )
+        @render.ui
+        def chat_footer():
+            if pipeline_phase.get() != "ready":
+                return ui.div()
+            parts = []
+            if chat_error.get():
+                parts.append(ui.p(chat_error.get(), class_="srag-error"))
+            parts.append(ui.p(f"Sessão: {chat_session_id.get()}", class_="srag-chat-meta"))
+            return ui.div(*parts)
 
         ui.input_text_area(
             "chat_message",

@@ -106,7 +106,7 @@ class LangGraphOrchestratorAgent:
             "Integre numeros e metricas naturalmente nas frases. "
             "Cubra as 4 metricas principais e tendencias sem inventar dados. "
             "Mencione atraso de notificacao se a serie recente parecer incompleta. "
-            "Use **negrito** com parcimonia, so em numeros ou termos-chave."
+            "Use **negrito** com cuidado, so em numeros ou termos-chave."
         )
         user_prompt = (
             f"Estado consultado: {scope}\n\n"
