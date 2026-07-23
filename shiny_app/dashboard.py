@@ -132,12 +132,6 @@ ui.tags.style(
         margin-top: 0.35rem;
         margin-bottom: 0;
     }
-    .srag-chat-tools {
-        font-size: 0.8rem;
-        color: #495057;
-        margin-top: 0.35rem;
-        margin-bottom: 0;
-    }
     .srag-chat-actions {
         display: flex;
         flex-wrap: wrap;
@@ -624,11 +618,6 @@ with ui.div(class_="srag-main"):
                         ui.strong(label),
                         ui.p(item.get("content") or "", style="margin-bottom: 0;"),
                     ]
-                    tools = item.get("tools_used") or []
-                    if tools:
-                        children.append(
-                            ui.p(f"Tools: {', '.join(tools)}", class_="srag-chat-tools")
-                        )
                     bubbles.append(ui.div(*children, class_=css))
 
                 if chat_awaiting_reply.get() or chat_task.status() == "running":
