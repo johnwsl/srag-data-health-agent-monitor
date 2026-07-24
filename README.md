@@ -1,6 +1,6 @@
 # SRAG Data Health Agent Chatbot Monitor
 
-Solução para monitoramento de **SRAG** (Síndrome Respiratória Aguda Grave) com dados do [OpenDataSUS](https://opendatasus.saude.gov.br/). O projeto executa download e ETL dos datasets, persiste os dados em **DuckDB**, expõe **métricas de saúde** via **FastAPI**, disponibiliza um **agente chatbot web em [http://localhost:8080](http://localhost:8080)** e inclui um **agente de IA** que gera resumos executivos com dados oficiais e notícias (**Tavily Search**), com download em **PDF**.
+Solução para monitoramento de **SRAG** (Síndrome Respiratória Aguda Grave) com dados do [OpenDataSUS](https://opendatasus.saude.gov.br/). O projeto executa download e ETL dos datasets, persiste os dados em **DuckDB**, expõe **métricas de saúde** via **FastAPI** e disponibiliza um **agente chatbot web em [http://localhost:8080](http://localhost:8080)**. No chat, um **agente orquestrador** (`LangGraphOrchestratorAgent`) interpreta o pedido do cliente e **decide dinamicamente** quais tools usar (métricas, séries, gráficos, notícias) e se gera um **resumo executivo** com dados oficiais e notícias (**Tavily Search**), com download em **PDF**.
 
 **Link Youtube - Vídeo de Demonstração:** https://www.youtube.com/watch?v=Q49YHI8IKac
 
@@ -28,8 +28,9 @@ O sistema entrega cinco blocos principais:
 4. **Pipeline** — Orquestra download + ETL em uma única chamada.
 5. **Métricas** — Taxa de aumento de casos, mortalidade, ocupação de UTI e vacinação COVID (UF ou `BRASIL`).
 6. **Dashboard** — Interface Shiny em **[http://localhost:8080](http://localhost:8080)** com chatbot e seção de relatório.
-7. **Chatbot / relatório** — Orquestrador único (`LangGraphOrchestratorAgent`) com tools dinâmicas, Tavily e `ChartSpec`; relatório em prosa + tabela de métricas + notícias com links; exportação PDF (ReportLab).
-8. **Auditoria** — Cada chat/relatório grava evento em `agent_audit_log` (consultável via API).
+7. **Agente orquestrador** — O `LangGraphOrchestratorAgent` interpreta o pedido do cliente no chat e **decide dinamicamente** quais tools usar (métricas, séries, gráficos, notícias) e se gera um relatório executivo — sem roteiro fixo de ferramentas.
+8. **Relatório / PDF** — Quando o cliente pede relatório, o orquestrador monta prosa + tabela de métricas + notícias com links (`ChartSpec` + Tavily) e o dashboard permite exportar em PDF (ReportLab).
+9. **Auditoria** — Cada chat/relatório grava evento em `agent_audit_log` (consultável via API).
 
 ## Acesso rápido
 
