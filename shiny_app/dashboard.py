@@ -555,7 +555,7 @@ with ui.div(class_="srag-main"):
         ui.h2("Agente Chatbot - Monitor de Saúde SRAG", class_="srag-page-title")
         ui.p(
             "Peça análises ou um relatório executivo no chatbot — informe uma UF (ex.: SP, Pernambuco) ou Brasil. "
-            "Quando o relatório for gerado, o download em PDF aparece em uma bolha (ou balão) do chat.",
+            "Quando o relatório for gerado, o download em PDF aparece em um balão do chat.",
             class_="srag-page-subtitle",
         )
 
@@ -595,7 +595,7 @@ with ui.div(class_="srag-main"):
             return ui.p(
                 "Pergunte sobre métricas/tendências ou peça um relatório executivo "
                 "citando a UF (ex.: SP, Pernambuco) ou Brasil. O relatório completo aparece na seção abaixo; "
-                "o PDF pode ser baixado pela bolha do chat.",
+                "o PDF pode ser baixado pelo balão do chat.",
                 class_="srag-page-subtitle",
             )
 
@@ -607,6 +607,9 @@ with ui.div(class_="srag-main"):
 
                 bubbles = []
                 for item in chat_messages.get():
+                    # Confirmacao do relatorio fica so no balão de PDF (evita mensagem duplicada).
+                    if item.get("role") == "assistant" and item.get("offer_pdf"):
+                        continue
                     role = item.get("role")
                     css = (
                         "srag-chat-bubble srag-chat-user"

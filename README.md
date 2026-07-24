@@ -37,7 +37,7 @@ O sistema entrega cinco blocos principais:
 - **API:** [http://localhost:8000](http://localhost:8000)
 - **Swagger / OpenAPI:** [http://localhost:8000/docs](http://localhost:8000/docs)
 
-No dashboard, peça análises ou um relatório no **chatbot** (informe a UF ou Brasil). O texto completo e os gráficos aparecem em **Relatório gerado por IA**; no chat surge uma bolha com **Baixar PDF** quando o relatório fica pronto.
+No dashboard, peça análises ou um relatório no **chatbot** (informe a UF ou Brasil). O texto completo e os gráficos aparecem em **Relatório gerado por IA**. Quando o relatório fica pronto, o chat mostra **apenas** o balão com **Baixar PDF** (sem repetir a mensagem de confirmação do agente). Nomes de tools (`tools_used`) ficam na API/auditoria e **não** são exibidos na UI.
 
 ## Endpoints principais
 
@@ -143,7 +143,7 @@ curl -X POST http://localhost:8000/datasets/pipeline
 **http://localhost:8080**
 
 - Chatbot para perguntas pontuais ou pedido de relatório (UF / Brasil)
-- Bolha dinâmica **Baixar PDF** no próprio chat quando há relatório
+- Balão dinâmico **Baixar PDF** no chat quando há relatório (substitui o balão de confirmação do agente)
 - Seção **Relatório gerado por IA** (texto completo + gráficos SRAG Plotly)
 - Escopo e período são informados pelo agente no chat
 

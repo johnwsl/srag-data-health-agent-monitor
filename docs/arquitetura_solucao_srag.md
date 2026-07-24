@@ -66,9 +66,10 @@ flowchart LR
 Dashboard **Shiny for Python** em `http://localhost:8080`:
 
 - **Chatbot** — perguntas pontuais ou pedido explícito de relatório (informe UF ou Brasil)
-- **Bolha Baixar PDF** — aparece dinamicamente no log do chat quando `report` está disponível (host estável dentro de `#srag-chat-log`; não é recriada a cada mensagem)
-- **Relatório gerado por IA** — texto completo + gráficos SRAG Plotly (o texto longo não vai nas bolhas de resposta)
-- Escopo e período analisado são informados pelo agente nas respostas
+- **Balão Baixar PDF** — única confirmação no chat quando há `report` (a `reply` de “relatório gerado” não é renderizada no balão de mensagem, para evitar duplicidade); host estável em `#srag-chat-log`
+- **Relatório gerado por IA** — texto completo + gráficos SRAG Plotly
+- Nomes de tools **não** aparecem na UI (`tools_used` só na API/auditoria)
+- Escopo e período analisado são informados pelo agente nas respostas pontuais
 - Sem filtro lateral de UF e sem botão “Gerar Relatório por IA”
 
 ### Backend
@@ -157,9 +158,9 @@ sequenceDiagram
     end
     O->>DB: agent_audit_log
     A-->>F: ChatResponse
-    F-->>U: Chat (reply curto)
+    F-->>U: Chat (reply curto, perguntas pontuais)
     opt Relatório gerado
-        F-->>U: Seção Relatório + bolha Baixar PDF
+        F-->>U: Seção Relatório + balão Baixar PDF (sem balão duplicado de confirmação)
         U->>F: Baixar PDF
         F->>A: POST /agents/report/pdf
         A-->>F: application/pdf
@@ -180,5 +181,5 @@ No dashboard, o analista consegue:
 - conversar sobre métricas, tendências e notícias de SRAG;
 - pedir relatório executivo citando UF ou Brasil;
 - ver o relatório completo e os gráficos SRAG no painel de relatório;
-- baixar o PDF pela bolha dinâmica no chatbot;
+- baixar o PDF pelo balão dinâmico no chatbot;
 - rastrear execuções via API de auditoria.

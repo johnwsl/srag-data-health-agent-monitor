@@ -10,7 +10,7 @@ O orquestrador (`LangGraphOrchestratorAgent`) combina:
 - **especificações de gráfico** (`ChartSpec`) para o dashboard Plotly
 - **auditoria** de cada execução no DuckDB
 
-No dashboard ([http://localhost:8080](http://localhost:8080)), o fluxo principal é o **chatbot**: o usuário pede análises ou um relatório citando UF/Brasil. O texto completo do relatório **não** vai para as bolhas de resposta — só para a seção **Relatório gerado por IA** (`ChatResponse.report`). Quando há relatório, o chat exibe uma **bolha dinâmica com Baixar PDF** (host estável em `#srag-chat-log`).
+No dashboard ([http://localhost:8080](http://localhost:8080)), o fluxo principal é o **chatbot**: o usuário pede análises ou um relatório citando UF/Brasil. O texto completo do relatório **não** vai para os balões de resposta — só para a seção **Relatório gerado por IA** (`ChatResponse.report`). Quando há relatório, o chat exibe **somente** a **balão dinâmico com Baixar PDF** (a confirmação textual do agente não é renderizada junto, para evitar duplicidade). Nomes de tools não são mostrados na UI.
 
 A API também expõe `POST /agents/report` (relatório one-shot), `POST /agents/report/pdf` (exportação PDF do payload já gerado) e `POST /agents/chat` (multi-turno).
 
@@ -72,7 +72,7 @@ A API também expõe `POST /agents/report` (relatório one-shot), `POST /agents/
 
 Recebe o payload já gerado (`estado`, `resumo_executivo`, `charts`) e devolve `application/pdf` via `ReportPdfService` (ReportLab) — **sem nova chamada à LLM**. O PDF inclui texto (negrito/links), a tabela de métricas, notícias clicáveis e gráficos redesenhados a partir dos `ChartSpec`.
 
-No dashboard, a bolha **Baixar PDF** do chatbot chama este endpoint com o `report_data` atual (atualiza ao gerar outro relatório, ex.: PE → RJ).
+No dashboard, o balão **Baixar PDF** do chatbot chama este endpoint com o `report_data` atual (atualiza ao gerar outro relatório, ex.: PE → RJ).
 
 ```bash
 curl -X POST http://localhost:8000/agents/report/pdf \
@@ -99,9 +99,9 @@ flowchart TD
     LG -->|texto final| C[reply no chat]
     O --> A[agent_audit_log]
     R --> UI[Seção Relatório gerado por IA]
-    R --> PDFBubble[Bolha Baixar PDF no chat]
+    R --> PDFBubble[Balão Baixar PDF no chat]
     PDFBubble --> PDF[POST /agents/report/pdf]
-    C --> UI2[Bolhas do chat]
+    C --> UI2[Balões do chat]
 ```
 
 ---
@@ -232,12 +232,13 @@ No Docker, o dashboard usa `API_BASE_URL=http://api:8000`. Após mudar `.env`: `
 Em [http://localhost:8080](http://localhost:8080) (`shiny_app/dashboard.py`):
 
 - **Chatbot** no topo: perguntas pontuais ou pedido explícito de relatório
-- **Bolha Baixar PDF**: host `#srag-pdf-offer-host` dentro de `#srag-chat-log` (irmão estável das mensagens); visível só quando há `report_data`; texto atualiza com o escopo do relatório atual
+- **Balão Baixar PDF**: host `#srag-pdf-offer-host` dentro de `#srag-chat-log`; visível só quando há `report_data`; é a **única** confirmação no chat ao gerar relatório (mensagens `offer_pdf` não são renderizadas como balão de texto)
 - **Relatório gerado por IA**: texto + gráficos SRAG diário/mensal (Plotly a partir de `ChartSpec`); subseções de gráfico só quando o relatório existe
 - Sem filtro lateral de UF nem botão “Gerar Relatório por IA”
-- Escopo e período vêm nas respostas do agente
+- Escopo e período vêm nas respostas pontuais do agente
+- `tools_used` permanece na API/auditoria, mas **não** é listado nos balões do chat
 - Auto-scroll do log do chat para o final
-- Botão **Nova conversa** (novo `session_id`; limpa relatório e a bolha de PDF)
+- Botão **Nova conversa** (novo `session_id`; limpa relatório e o balão de PDF)
 
 ---
 
@@ -253,7 +254,7 @@ Em [http://localhost:8080](http://localhost:8080) (`shiny_app/dashboard.py`):
 | `tests/unit/test_chart_spec_service.py` | ChartSpec |
 | `tests/unit/test_srag_metrics_api_service.py` | Cliente HTTP + tools |
 | `tests/unit/test_openai_langchain_service.py` | OpenAI / LangChain |
-| `tests/unit/test_tavily_news_service.py` | Notícias e guardrails |
+| `tests/unit/test_tavily_news_service.py` | Notícias, `listar_noticias` e guardrails |
 
 ```bash
 pytest tests/unit/test_agent_audit_service.py \

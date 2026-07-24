@@ -26,7 +26,7 @@ Dados públicos de SRAG (OpenDataSUS) → pipeline ETL → DuckDB → API FastAP
 |-------|--------|
 | **Pipeline** | Download dos CSVs OpenDataSUS + ETL → `data/srag.duckdb` (`srag_notificacoes`) |
 | **Métricas** | Quatro indicadores + séries diária/mensal por UF ou `BRASIL` |
-| **Dashboard** | Chatbot + seção **Relatório gerado por IA** + bolha **Baixar PDF** |
+| **Dashboard** | Chatbot + seção **Relatório gerado por IA** + balão **Baixar PDF** |
 | **Orquestrador** | LangGraph ReAct: escolhe tools (métricas, séries, gráficos, notícias, relatório) |
 | **Auditoria** | Cada execução em `agent_audit_log` (consultável via API) |
 
@@ -125,14 +125,15 @@ flowchart TD
     Rel --> Report[report + charts]
     ReAct -->|texto| Reply[reply curto no chat]
     Chat --> Aud[agent_audit_log]
-    Report --> UI[Seção Relatório + bolha Baixar PDF]
-    Reply --> Bubbles[Bolhas do chat]
+    Report --> UI[Seção Relatório + balão Baixar PDF]
+    Reply --> Bubbles[Balões do chat]
+    Report -.->|UI omite reply duplicada| Bubbles
 ```
 
 1. Garante que o pipeline de dados está pronto.
 2. Loop ReAct: escolhe e executa tools.
 3. Responde no chat (escopo e período quando usa métricas).
-4. Se pediu relatório: monta `report` e devolve para a UI (texto longo **não** vai na bolha de resposta).
+4. Se pediu relatório: monta `report` e devolve para a UI; no dashboard, a confirmação no chat é só o balão **Baixar PDF**.
 5. Grava auditoria e retorna `audit_id`.
 
 ### O que entra no relatório
@@ -148,7 +149,7 @@ Limite total do `resumo_executivo`: **5000** caracteres.
 
 ### PDF
 
-`POST /agents/report/pdf` recebe `estado` + `resumo_executivo` + `charts` e gera o PDF com ReportLab (**sem** nova chamada à LLM). No dashboard, a bolha **Baixar PDF** no chat usa esse endpoint.
+`POST /agents/report/pdf` recebe `estado` + `resumo_executivo` + `charts` e gera o PDF com ReportLab (**sem** nova chamada à LLM). No dashboard, o balão **Baixar PDF** no chat usa esse endpoint.
 
 ### Guardrails (resumo)
 
@@ -161,10 +162,12 @@ Limite total do `resumo_executivo`: **5000** caracteres.
 
 ## Experiência no dashboard
 
-1. Perguntas pontuais → resposta nas bolhas do chat.
-2. “Gere o relatório de PE/RJ/Brasil…” → reply curto no chat + texto/gráficos em **Relatório gerado por IA**.
-3. Bolha **Baixar PDF** aparece no log do chat (atualiza se um novo relatório for gerado).
+1. Perguntas pontuais → resposta nos balões do chat.
+2. “Gere o relatório de PE/RJ/Brasil…” → balão **Baixar PDF** no chat + texto/gráficos em **Relatório gerado por IA** (sem segundo balão de confirmação).
+3. O balão de PDF atualiza se um novo relatório for gerado.
 4. **Nova conversa** reinicia a sessão e limpa o relatório atual.
+
+Nomes de tools do LangGraph **não** são exibidos na UI.
 
 ---
 

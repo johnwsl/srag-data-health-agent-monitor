@@ -455,13 +455,13 @@ curl http://localhost:8000/metrics/RJ
 
 ### Dashboard
 
-Com a API em execução, o dashboard Shiny está em **[http://localhost:8080](http://localhost:8080)** (serviço `dashboard` no Docker ou `shiny run shiny_app/dashboard.py` localmente). Use o **chatbot** para consultar métricas/tendências ou pedir um relatório executivo (informe UF ou Brasil). O texto completo e os gráficos aparecem na seção **Relatório gerado por IA**; a bolha **Baixar PDF** surge no chat quando o relatório está pronto.
+Com a API em execução, o dashboard Shiny está em **[http://localhost:8080](http://localhost:8080)** (serviço `dashboard` no Docker ou `shiny run shiny_app/dashboard.py` localmente). Use o **chatbot** para consultar métricas/tendências ou pedir um relatório executivo (informe UF ou Brasil). O texto completo e os gráficos aparecem na seção **Relatório gerado por IA**; o balão **Baixar PDF** surge no chat quando o relatório está pronto.
 
 ---
 
 ## Testes automatizados
 
-O projeto inclui **71 testes** em `tests/unit` e `tests/integration`:
+O projeto inclui **109 testes** em `tests/unit` e `tests/integration` (`pytest.ini` coleta só esses caminhos):
 
 | Arquivo | Cobertura |
 |---------|-----------|
