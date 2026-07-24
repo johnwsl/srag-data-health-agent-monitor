@@ -12,12 +12,13 @@ Solução para monitoramento de **SRAG** (Síndrome Respiratória Aguda Grave) c
 
 Esta PoC responde a uma pergunta prática: como transformar dados públicos de SRAG em uma interface analítica com métricas, séries temporais, chatbot e relatório automatizado por IA.
 
-O sistema entrega cinco blocos principais:
+O sistema entrega seis blocos principais:
 
 - **Pipeline de dados**: baixa os CSVs do OpenDataSUS e prepara os dados para análise.
 - **API de métricas**: expõe indicadores por UF ou para `BRASIL`.
 - **Dashboard web**: frontend em Shiny (chatbot + relatório gerado por IA).
 - **Orquestrador LangGraph**: tool calling dinâmico (métricas, séries, gráficos, notícias, relatório).
+- **Guardrails**: escopo SRAG, números só via tools oficiais e filtro de notícias.
 - **Auditoria**: trilha de governança das execuções do agente no DuckDB.
 
 ## O que o sistema faz
@@ -31,6 +32,17 @@ O sistema entrega cinco blocos principais:
 7. **Agente orquestrador** — O `LangGraphOrchestratorAgent` interpreta o pedido do cliente no chat e **decide dinamicamente** quais tools usar (métricas, séries, gráficos, notícias) e se gera um relatório executivo — sem roteiro fixo de ferramentas.
 8. **Relatório / PDF** — Quando o cliente pede relatório, o orquestrador monta prosa + tabela de métricas + notícias com links (`ChartSpec` + Tavily) e o dashboard permite exportar em PDF (ReportLab).
 9. **Auditoria** — Cada chat/relatório grava evento em `agent_audit_log` (consultável via API).
+
+## Guardrails
+
+O orquestrador e as notícias seguem restrições de escopo e qualidade:
+
+- **Escopo** — só SRAG / saúde respiratória no Brasil; pedidos fora do tema são recusados
+- **Dados** — números vêm das tools oficiais (API do projeto); a LLM não inventa métricas
+- **Relatório** — `gerar_relatorio_executivo` só com pedido explícito; o chat não cola o texto completo
+- **Notícias** — Tavily com domínios confiáveis, foco Brasil e bloqueio de termos inadequados
+
+Detalhes: [`docs/agente_orquestrador.md`](docs/agente_orquestrador.md#guardrails).
 
 ## Acesso rápido
 
