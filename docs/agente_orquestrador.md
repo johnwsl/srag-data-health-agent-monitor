@@ -244,21 +244,24 @@ Em [http://localhost:8080](http://localhost:8080) (`shiny_app/dashboard.py`):
 
 ## Testes
 
-| Arquivo | Cobertura |
-|---------|-----------|
-| `tests/unit/test_srag_report_agent.py` | Relatório / limite 5000 chars / charts |
-| `tests/unit/test_srag_chat_agent.py` | Chat, tools do turno, report, auditoria |
-| `tests/unit/test_agent_routes.py` | `/agents/report`, `/report/pdf`, `/chat`, `/audit` |
-| `tests/unit/test_report_pdf_service.py` | Montagem PDF (texto, tabela, links, charts) |
-| `tests/unit/test_agent_audit_service.py` | Persistência DuckDB da auditoria |
-| `tests/unit/test_chart_spec_service.py` | ChartSpec |
-| `tests/unit/test_srag_metrics_api_service.py` | Cliente HTTP + tools |
-| `tests/unit/test_openai_langchain_service.py` | OpenAI / LangChain |
-| `tests/unit/test_tavily_news_service.py` | Notícias, `listar_noticias` e guardrails |
+Convenção: **unitário** = função pura; **integração** = efeito colateral (DuckDB, HTTP, LLM/Tavily/LangGraph, PDF completo).
+
+| Arquivo | Tipo | Cobertura |
+|---------|------|-----------|
+| `tests/unit/test_orchestrator_pure.py` | unitário | humanize, tabela de métricas, notícias markdown |
+| `tests/unit/test_report_pdf_service.py` | unitário | markdown → flowables ReportLab |
+| `tests/unit/test_chart_spec_service.py` | unitário | `from_metrics_payload` |
+| `tests/unit/test_tavily_filters.py` | unitário | filtro/resumo de notícias |
+| `tests/integration/test_srag_report_agent.py` | integração | composição do relatório (LLM/métricas mockadas) |
+| `tests/integration/test_srag_chat_agent.py` | integração | chat LangGraph + auditoria |
+| `tests/integration/test_agent_routes.py` | integração | `/agents/report`, `/report/pdf`, `/chat`, `/audit` |
+| `tests/integration/test_report_pdf_service.py` | integração | `ReportPdfService.build` |
+| `tests/integration/test_agent_audit_service.py` | integração | persistência DuckDB da auditoria |
+| `tests/integration/test_tavily_news_service.py` | integração | service/tool Tavily |
+| `tests/integration/test_openai_langchain_service.py` | integração | cliente OpenAI/LangChain |
+| `tests/integration/test_srag_metrics_api_service.py` | integração | cliente HTTP + tools de métricas |
 
 ```bash
-pytest tests/unit/test_agent_audit_service.py \
-       tests/unit/test_srag_chat_agent.py \
-       tests/unit/test_agent_routes.py \
-       tests/unit/test_report_pdf_service.py -v
+pytest tests/unit/test_orchestrator_pure.py tests/unit/test_report_pdf_service.py -v
+pytest tests/integration/test_agent_routes.py tests/integration/test_srag_chat_agent.py -v
 ```

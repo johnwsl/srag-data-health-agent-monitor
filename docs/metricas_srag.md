@@ -665,16 +665,18 @@ Cada métrica executa queries SQL na tabela `srag_notificacoes`:
 
 ## Testes automatizados
 
-Os cenários acima são cobertos por testes em:
+Métricas usam DuckDB → ficam em **integração** (efeito colateral). Convenção geral: unitário = função pura; integração = I/O.
 
 | Arquivo | Testes |
 |---------|--------|
-| `tests/unit/test_srag_metrics.py` | Cálculo, escopo por UF, métodos em lote, séries temporais |
-| `tests/unit/test_metrics_routes.py` | Rotas de métricas com mocks |
-| `tests/integration/test_metrics_routes.py` | Integração real com métricas e séries temporais |
+| `tests/integration/test_srag_metrics.py` | Cálculo, escopo por UF, métodos em lote, séries temporais |
+| `tests/integration/test_metrics_routes_mocked.py` | Rotas de métricas com mocks |
+| `tests/integration/test_metrics_routes.py` | Rotas HTTP + DuckDB |
 
 ```bash
-pytest tests/unit/test_srag_metrics.py tests/unit/test_metrics_routes.py tests/integration/test_metrics_routes.py -v
+pytest tests/integration/test_srag_metrics.py \
+       tests/integration/test_metrics_routes.py \
+       tests/integration/test_metrics_routes_mocked.py -v
 ```
 
 ---

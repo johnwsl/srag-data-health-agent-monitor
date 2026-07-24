@@ -461,22 +461,29 @@ Com a API em execução, o dashboard Shiny está em **[http://localhost:8080](ht
 
 ## Testes automatizados
 
-O projeto inclui **109 testes** em `tests/unit` e `tests/integration` (`pytest.ini` coleta só esses caminhos):
+Convenção:
 
-| Arquivo | Cobertura |
-|---------|-----------|
-| `tests/unit/test_dataset_service.py` | Download de datasets |
-| `tests/unit/test_etl_service.py` | Pipeline de ETL |
-| `tests/unit/test_pipeline_status.py` | Status do pipeline (`GET /datasets/status`) |
-| `tests/unit/test_srag_metrics.py` | Cálculo de métricas, séries temporais e escopo por UF |
-| `tests/unit/test_metrics_routes.py` | Rotas de métricas com mocks |
-| `tests/integration/test_metrics_routes.py` | Integração real com a API de métricas e séries |
+- **`tests/unit/`** — funções/métodos **puros** (sem efeitos colaterais)
+- **`tests/integration/`** — I/O e integrações (DuckDB, HTTP, disco, serviços externos mockados ou reais em memória)
+
+O projeto inclui **118 testes** (`pytest.ini` coleta `tests/unit` e `tests/integration`).
+
+Exemplos:
+
+| Arquivo | Tipo | Cobertura |
+|---------|------|-----------|
+| `tests/unit/test_etl_transforms.py` | unitário | `_filter_required_fields` / `_fill_missing_values` |
+| `tests/unit/test_scope_detection.py` | unitário | detecção de UF/Brasil |
+| `tests/integration/test_etl_service.py` | integração | `EtlService.run` → DuckDB |
+| `tests/integration/test_srag_metrics.py` | integração | métricas com DuckDB |
+| `tests/integration/test_metrics_routes.py` | integração | rotas HTTP + DuckDB |
+| `tests/integration/test_dataset_service.py` | integração | download (MockTransport) |
 
 ```bash
 pytest
+pytest tests/unit -q
+pytest tests/integration -q
 ```
-
-Os testes de download usam `httpx.MockTransport` (sem internet). Os testes de ETL e métricas usam bancos DuckDB temporários.
 
 ---
 

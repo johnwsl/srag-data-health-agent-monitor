@@ -234,25 +234,3 @@ def test_generate_executive_summary_rejects_invalid_uf():
         assert False, "deveria ter levantado ValueError"
     except ValueError as error:
         assert "UF invalida" in str(error)
-
-
-def test_humanize_report_text_converts_bullets_to_prose():
-    orchestrator = LangGraphOrchestratorAgent(
-        llm_service=MagicMock(),
-        metrics_service=FakeMetricsService(SAMPLE_METRICS_PAYLOAD),
-        news_service=MagicMock(),
-        chart_spec_service=ChartSpecService(),
-        graph=MagicMock(),
-        audit_service=AgentAuditService(enabled=False),
-    )
-    raw = (
-        "Taxa de Aumento de Casos:\n"
-        "- Casos em Junho de 2026: 51.892\n"
-        "- Casos em Maio de 2026: 63.305\n"
-        "- Taxa de Aumento Percentual: -18,03%\n"
-    )
-    prose = orchestrator._humanize_report_text(raw)
-    assert "•" not in prose
-    assert "- Casos" not in prose
-    assert "51.892" in prose
-    assert "Taxa de Aumento de Casos" in prose

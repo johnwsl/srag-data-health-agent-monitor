@@ -1,10 +1,9 @@
+"""Testes unitarios de funcoes puras do PDF (markdown -> ReportLab flowables)."""
+
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.platypus import Table
 
-from app.models.chart import ChartAxisSpec, ChartSpec
-from app.models.chat import ChatReportPayload
 from app.services.report_pdf_service import (
-    ReportPdfService,
     _inline_markdown_to_reportlab,
     _resumo_to_flowables,
 )
@@ -27,40 +26,12 @@ COMPOSED_RESUMO = (
 )
 
 
-def _sample_payload() -> ChatReportPayload:
-    return ChatReportPayload(
-        estado="SP",
-        resumo_executivo=COMPOSED_RESUMO,
-        charts=[
-            ChartSpec(
-                id="casos_diarios",
-                type="line",
-                title="Casos diários de SRAG (últimos 30 dias) — SP",
-                x=ChartAxisSpec(field="data", label="Data"),
-                y=ChartAxisSpec(field="casos", label="Notificações"),
-                data=[
-                    {"data": "2026-06-01", "casos": 2},
-                    {"data": "2026-06-02", "casos": 5},
-                    {"data": "2026-06-03", "casos": 4},
-                ],
-                source="GET /metrics/SP/casos-diarios",
-                caveat="Períodos recentes podem estar incompletos.",
-            ),
-            ChartSpec(
-                id="casos_mensais",
-                type="bar",
-                title="Casos mensais de SRAG (últimos 12 meses) — SP",
-                x=ChartAxisSpec(field="label", label="Mês"),
-                y=ChartAxisSpec(field="casos", label="Notificações"),
-                data=[
-                    {"label": "04/2026", "casos": 80},
-                    {"label": "05/2026", "casos": 95},
-                    {"label": "06/2026", "casos": 70},
-                ],
-                source="GET /metrics/SP/casos-mensais",
-            ),
-        ],
-    )
+def _flowable_styles():
+    styles = getSampleStyleSheet()
+    body = ParagraphStyle("body", parent=styles["Normal"])
+    section = ParagraphStyle("section", parent=styles["Heading2"])
+    bullet = ParagraphStyle("bullet", parent=body, leftIndent=10)
+    return body, section, bullet
 
 
 def test_inline_markdown_converts_bold_and_links():
@@ -68,14 +39,6 @@ def test_inline_markdown_converts_bold_and_links():
     html_link = _inline_markdown_to_reportlab("[SRAG](https://www.gov.br/saude)")
     assert '<link href="https://www.gov.br/saude"' in html_link
     assert "<u>SRAG</u>" in html_link
-
-
-def _flowable_styles():
-    styles = getSampleStyleSheet()
-    body = ParagraphStyle("body", parent=styles["Normal"])
-    section = ParagraphStyle("section", parent=styles["Heading2"])
-    bullet = ParagraphStyle("bullet", parent=body, leftIndent=10)
-    return body, section, bullet
 
 
 def test_resumo_to_flowables_renders_narrative_table_and_news_links():
@@ -107,21 +70,3 @@ def test_resumo_to_flowables_renders_narrative_table_and_news_links():
     assert "Quatro métricas principais" in rendered
     assert "Notícias encontradas" in rendered
     assert "SRAG em queda no Brasil" in rendered
-
-
-def test_report_pdf_service_builds_valid_pdf():
-    pdf_bytes = ReportPdfService().build(_sample_payload())
-
-    assert pdf_bytes.startswith(b"%PDF")
-    assert len(pdf_bytes) > 800
-
-
-def test_report_pdf_monthly_bars_preserve_all_points():
-    payload = _sample_payload()
-    payload.charts[1].data = [
-        {"label": f"{month:02d}/2025", "casos": month * 3}
-        for month in range(1, 13)
-    ]
-    pdf_bytes = ReportPdfService().build(payload)
-    assert pdf_bytes.startswith(b"%PDF")
-    assert len(pdf_bytes) > 800

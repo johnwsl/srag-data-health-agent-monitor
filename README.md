@@ -202,12 +202,17 @@ Variável opcional: `API_BASE_URL` (padrão `http://127.0.0.1:8000`).
 
 ## Testes
 
+Convenção do projeto:
+
+- **`tests/unit/`** — apenas funções/métodos **puros** (sem I/O, sem efeitos colaterais)
+- **`tests/integration/`** — tudo com efeito colateral (DuckDB, HTTP, disco, LLM/Tavily/LangGraph, PDF completo, etc.)
+
 ```bash
 pip install -r requirements.txt
 pytest
 ```
 
-A suíte cobre download, ETL, métricas, rotas, Tavily, OpenAI, orquestrador LangGraph, chat/report, exportação PDF e auditoria.
+A suíte tem **118 testes** (18 unitários + 100 de integração).
 
 ## Documentação
 
